@@ -1,10 +1,13 @@
+.cvsignore
 bin/haverd.pl
-Changes
+client.pl
 lib/Haver/Server.pm
 lib/Haver/Server/Channel.pm
+lib/Haver/Server/Commands.pm
 lib/Haver/Server/Connection.pm
 lib/Haver/Server/Listener.pm
 lib/Haver/Server/Object.pm
+lib/Haver/Server/Object/Index.pm
 lib/Haver/Server/Registry.pm
 lib/Haver/Server/User.pm
 MANIFEST			This list of files

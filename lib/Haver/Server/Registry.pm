@@ -1,4 +1,4 @@
-# Haver::Server::Registry - Container for users, channels, etc.
+# Haver::Server::Registry - Index for users, channels, etc.
 # 
 # Copyright (C) 2003 Dylan William Hardison
 #
@@ -20,9 +20,9 @@ use strict;
 use warnings;
 
 use Haver::Singleton;
-use Haver::Server::Object::Container;
+use Haver::Server::Object::Index;
 
-use base qw( Haver::Singleton Haver::Server::Object::Container );
+use base qw( Haver::Singleton Haver::Server::Object::Index );
 
 our $VERSION = '0.02';
 
@@ -31,7 +31,7 @@ sub initialize {
 	$me->{id} = 'registry';
 	
 	# XXX Hello, I am a HACK! somebody please FIXME!
-	Haver::Server::Object::Container->can('initialize')->(@_);
+	Haver::Server::Object::Index->can('initialize')->(@_);
 }
 sub namespace {
 	'registry';

@@ -2,8 +2,8 @@ package Haver::Server::Channel;
 use strict;
 use warnings;
 
-use Haver::Server::Object::Container;
-use base ('Haver::Server::Object::Container');
+use Haver::Server::Object::Index;
+use base ('Haver::Server::Object::Index');
 
 our $VERSION = '0.02';
 

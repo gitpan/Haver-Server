@@ -24,7 +24,7 @@ BEGIN {
 	use Exporter;
 	use base 'Exporter';
 
-	our $VERSION = 0.04;
+	our $VERSION = 0.042;
 	our @EXPORT = ();
 	our @EXPORT_OK = qw( $Registry );
 }

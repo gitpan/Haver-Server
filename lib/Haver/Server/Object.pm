@@ -134,6 +134,10 @@ sub load {
 	$me->{_flags}  = $data->{flags};
 	$me->{_perms}  = $data->{perms};
 	
+	if ($data->{NS} ne $me->namespace) {
+		die "Can't load $file. "
+	}
+	
 	print "DEBUG: Loading " . $me->filename, "\n";
 	$me->on_load($data);
 }
