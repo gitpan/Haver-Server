@@ -1,6 +1,6 @@
 --- #YAML:1.0
 name: haver-server
-version: 0.05
+version: 0.051
 license: gpl
 distribution_type: module
 requires:
@@ -15,12 +15,13 @@ conflicts: {}
 provides:
   Haver::Server:
     file: lib/Haver/Server.pm
-    version: 0.05
+    version: 0.051
   Haver::Server::Channel:
     file: lib/Haver/Server/Channel.pm
     version: 0.02
   Haver::Server::Commands:
     file: lib/Haver/Server/Commands.pm
+    version: 0.02
   Haver::Server::Connection:
     file: lib/Haver/Server/Connection.pm
   Haver::Server::Listener:

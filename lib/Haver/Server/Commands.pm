@@ -27,9 +27,9 @@ use POE;
 use POE::Preprocessor;
 
 use Haver::Server qw( $Registry $Config );
-use Haver::Protocol::Errors qw( %Errors   );
 use Digest::SHA1 qw(sha1_base64);
 
+our $VERSION = 0.02;
 our $RELOAD = 1;
 our @Commands = qw(
 	UID PASS VERSION CANT

@@ -22,7 +22,7 @@ use strict;
 our %Feature;
 our $Config;
 our $Registry;
-our $VERSION = 0.05;
+our $VERSION = 0.051;
 BEGIN {
 	use open ":utf8";
 	use Exporter;
@@ -42,7 +42,6 @@ use Haver::Server::User;
 
 use Haver::Config;
 use Haver::Utils::Logger;
-use Haver::Protocol::Errors;
 use Haver::Protocol::Filter;
 use Haver::Reload;
 
