@@ -22,7 +22,7 @@ use strict;
 our %Feature;
 our $Config;
 our $Registry;
-our $VERSION = 0.051;
+our $VERSION = 0.052;
 BEGIN {
 	use open ":utf8";
 	use Exporter;
@@ -65,7 +65,6 @@ sub boot {
 	
 
 	Haver::Reload->init;
-	Haver::Protocol::Errors->server_mode();
 	$Config   = new Haver::Config(file => $opts{config});
 	$Registry = instance Haver::Server::Registry;
 
