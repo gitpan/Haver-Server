@@ -1,6 +1,44 @@
-Revision history for Perl extension Haver::Server.
+2004-02-16  dylanwh <dylanwh@tampabay.rr.com>
 
-0.01  Sun Feb 15 21:13:51 2004
-	- original version; created by h2xs 1.23 with options
-		-XA --name=Haver::Server
+	* lib/Haver/Server/Channel.pm, lib/Haver/Server/Connection.pm,
+	lib/Haver/Server/User.pm: Made the client's output more JRC-like.
+
+2004-02-16  dylanwh <dylanwh@tampabay.rr.com>
+
+	* lib/Haver/Server/Connection.pm, lib/Haver/Server/User.pm: Server
+	now sends PINGs and expects PONGs, about every two minutes. There
+	might be bugs, though.
+
+	I reorganized accept and reject code into two different events of
+	the same names.
+
+	I also made it illegal (REJECT-able, that is) for the client to
+	just send 'UID'.
+
+2004-02-16  dylanwh <dylanwh@tampabay.rr.com>
+
+	* .cvsignore: Added .cvsignore files.
+
+2004-02-15  bdonlan <bdonlan@bd-home-comp.no-ip.org>
+
+	* MANIFEST, MANIFEST.SKIP: Add MANIFEST.bak and META.yml to
+	MANIFEST.SKIP
+
+2004-02-15  dylanwh <dylanwh@tampabay.rr.com>
+
+	* MANIFEST, MANIFEST.SKIP, lib/Haver/Server.pm: Fixed manifest
+	files.
+
+2004-02-15  dylanwh <dylanwh@tampabay.rr.com>
+
+	* Makefile.PL, bin/haverd.pl: We're re-organizing the directory
+	structure, so it is more modular.
+
+2004-02-15  dylanwh <dylanwh@tampabay.rr.com>
+
+	* MANIFEST, Makefile.PL, README, lib/Haver/Server.pm,
+	lib/Haver/Server/Channel.pm, lib/Haver/Server/Connection.pm,
+	lib/Haver/Server/Listener.pm, lib/Haver/Server/Object.pm,
+	lib/Haver/Server/Registry.pm, lib/Haver/Server/User.pm,
+	t/test-1.pl: Commiting server.
 

@@ -33,9 +33,20 @@ sub initialize {
 
 	$me->{uid}      ||= 'user'.$UID++;
 	$me->{cid_list}   = {};
-	croak "session id (sid) required!" unless $me->{sid};
+
 	
+	croak "session id (sid) required!" unless $me->{sid};
 	$POE::Kernel::poe_kernel->refcount_increment($me->{sid}, __PACKAGE__);
+}
+
+sub valid_uid {
+	my ($this, $uid) = @_;
+
+	if (defined $uid && $uid ne '.' && $uid =~ /^[A-Za-z _'\.-]+$/) {
+		return 1;
+	} else {
+		return 0;
+	}
 }
 
 sub finalize {

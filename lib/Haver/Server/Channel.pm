@@ -29,7 +29,7 @@ sub send {
 	#print "-- c-end --\n";
 
 
-	foreach my $user ($me->userlist) {
+	foreach my $user ($me->users_by_val) {
 		$user->send(@_);
 	}
 }
@@ -61,14 +61,14 @@ sub contains {
 }
 
 
-sub userlist {
+sub users_by_val {
 	my ($me)  = @_;
 	my @users = values %{ $me->{userlist} };
 
 	return wantarray ? @users : \@users;
 }
 
-sub uidlist {
+sub users_by_id {
 	my ($me)  = @_;
 	my @users = keys %{ $me->{userlist} };
 

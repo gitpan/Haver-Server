@@ -24,6 +24,18 @@ $|++;
 use POE;
 use Haver::Server::Listener ;
 use Haver::Utils::Logger;
+use Haver::Server::Registry;
+
+my $Registry = instance Haver::Server::Registry;
+$Registry->add_channel(
+	new Haver::Server::Channel(cid => 'lobby')
+);
+for (1 .. 5) {
+	$Registry->add_channel(
+		new Haver::Server::Channel(cid => "spoon-$_")
+	);
+}
+
 
 create Haver::Utils::Logger ;
 create Haver::Server::Listener (shift || 7070);

@@ -1,6 +1,6 @@
 # Haver::Server - The Server class.
 # 
-# Copyright (C) 2003 Dylan William Hardison
+# Copyright (C) 2003-2004 Dylan William Hardison
 #
 # This module is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -21,7 +21,7 @@ package Haver::Server;
 use strict;
 use warnings;
 
-our $VERSION = 0.02;
+our $VERSION = 0.03;
 
 
 
@@ -69,7 +69,7 @@ Dylan William Hardison, E<lt>dylanwh@tampabay.rr.comE<gt>
 
 =head1 COPYRIGHT AND LICENSE
 
-Copyright (C) 2004 by Dylan William Hardison
+Copyright (C) 2003-2004 by Dylan William Hardison
 
 This module is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
