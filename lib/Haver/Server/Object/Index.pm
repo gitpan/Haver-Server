@@ -18,11 +18,9 @@
 package Haver::Server::Object::Index;
 use strict;
 use warnings;
+use Carp;
 
-use Haver::Server::Object;
-use base 'Haver::Server::Object';
-
-our $VERSION = '0.02';
+our $VERSION = '0.03';
 
 sub namespace {
 	return 'container';
@@ -34,20 +32,26 @@ sub add {
 	my $ns = $object->namespace;
 	
 	if (not($me->contains($ns, $id)) && $me->can_contain($object)) {
-		$me->{$ns}{$id} = $object;
+		$me->{".$ns"}{$id} = $object;
 	} else {
 		return undef;
 	}
 }
 sub fetch {
 	my ($me, $ns, $id) = @_;
-	
-	return $me->{$ns}{$id} if $me->contains($ns, $id);
+	if (@_ != 3) {
+		croak "fetch must be called with exactly three arguments!";
+	}
+
+	return $me->{".$ns"}{$id} if $me->contains($ns, $id);
 }
 sub contains {
 	my ($me, $ns, $id) = @_;
+	if (@_ != 3) {
+		croak "contains must be called with exactly three arguments!";
+	}
 	
-	return exists $me->{$ns}{$id};
+	return exists $me->{".$ns"}{$id};
 }
 sub remove {
 	my $me = shift;
@@ -62,17 +66,17 @@ sub remove {
 	} else {
 		die "Wrong number of arguments.";
 	}
-	delete $me->{$ns}{$id};
+	delete $me->{".$ns"}{$id};
 }
 sub list_ids {
 	my ($me, $ns) = @_;
-	my $h = $me->{$ns};
+	my $h = $me->{".$ns"};
 
 	wantarray ? keys %$h : [ keys %$h ];
 }
 sub list_vals {
 	my ($me, $ns) = @_;
-	my $h = $me->{$ns};
+	my $h = $me->{".$ns"};
 
 	wantarray ? values %$h : [ values %$h ];
 }

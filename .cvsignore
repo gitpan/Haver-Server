@@ -1,6 +1,9 @@
-META.yml
-Makefile
+Build
 blib
 pm_to_blib
 Changes
+META.yml
+MANIFEST
 store
+Makefile.PL
+_build

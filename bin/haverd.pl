@@ -21,23 +21,21 @@ use warnings;
 use Haver::Server;
 use Getopt::Long;
 my $logfile  = '-';
-my $confdir  = './store';
+my $config   = 'haverd.yml';
 my $daemon   = 0;
-my $port;
+my $port     = 7070;
 
 GetOptions (
 	"logfile=s"   => \$logfile,
-	"confdir=s"   => \$confdir,
+	"config=s"   => \$config,
 	'daemon'      => \$daemon,
 	'port=i'      => \$port,
 );
 
-my $chan = new Haver::Server::Channel(id => 'lobby');
-Haver::Server::Registry->instance->add($chan);
 
 Haver::Server->boot(
 	logfile => $logfile,
-	confdir => $confdir,
-	$port ? (port => $port) : (),
+	config  => $config,
+	port    => $port,
 	daemon  => $daemon,
 );

@@ -1,4 +1,4 @@
-Haver-Server version 0.04 ('Vinegar')
+Haver-Server version 0.05
 =========================
 
 Haver's a new chat system similar to IRC,
@@ -8,7 +8,8 @@ flexible.
 Haver will never replace IRC, rather it
 is intended for a different niche: Fairly
 small servers. Haver doesn't make any attempts
-at doing multi-server stuff.
+at doing multi-server stuff. We try to generalize
+everything, and not have too many special cases.
 
 Why was haver written?
 Because IRC is really... disorganized.
@@ -18,6 +19,7 @@ is just plain icky, in my opinion.
 Also, writing the server, the clients,
 devising a protocol that is simple, is
 terribly fun stuff.
+
 
 
 INSTALLATION

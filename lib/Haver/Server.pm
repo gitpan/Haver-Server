@@ -17,16 +17,20 @@
 # Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package Haver::Server;
 use strict;
-use warnings;
+#use warnings;
 
+our %Feature;
+our $Config;
 our $Registry;
+our $VERSION = 0.05;
 BEGIN {
+	use open ":utf8";
 	use Exporter;
 	use base 'Exporter';
 
-	our $VERSION = 0.042;
+	our $RELOAD  = 1;
 	our @EXPORT = ();
-	our @EXPORT_OK = qw( $Registry );
+	our @EXPORT_OK = qw( $Registry $Config %Feature );
 }
 
 use IO::Poll;
@@ -36,30 +40,53 @@ use Haver::Server::Registry;
 use Haver::Server::Channel;
 use Haver::Server::User;
 
+use Haver::Config;
 use Haver::Utils::Logger;
 use Haver::Protocol::Errors;
-
-use Devel::Size qw(total_size);
-
+use Haver::Protocol::Filter;
+use Haver::Reload;
 
 sub boot {
 	my ($this, %opts) = @_;
 	$|++;
 
+
+	eval {
+		require  POE::Component::IKC::Server;
+		import  POE::Component::IKC::Server;
+	};
+	unless ($@) {
+		create_ikc_server(
+			ip    => 'localhost', 
+			port  => 4040,
+			name  => 'Haver'
+		);
+		$Feature{IKC} = 1;
+	}
+	
+
+	Haver::Reload->init;
 	Haver::Protocol::Errors->server_mode();
+	$Config   = new Haver::Config(file => $opts{config});
 	$Registry = instance Haver::Server::Registry;
 
-	$Haver::Server::Object::DataDir = $opts{confdir};
-	$Registry->load();
+	foreach my $cid (@{ $Config->{Channels} }) {
+		my $chan = new Haver::Server::Channel(id => $cid);
+		eval { $chan->load };
+		if ($@) {
+			warn "Can't load $cid.\n$@";
+		}
+		$Registry->add($chan);
+	}
 
+	
 	$this->create(%opts);
 	$poe_kernel->run();
 }
 sub create {
 	my ($class, %opts) = @_;
 	POE::Session->create(
-		package_states => 
-		[
+		package_states => [
 			$class => [
 				'_start',
 				'_stop',
@@ -74,10 +101,10 @@ sub create {
 
 sub _start {
 	my ($kernel, $heap) = @_[KERNEL, HEAP];
-	my $port = $heap->{port} || $Registry->get_field('ServerPort');
+	my $port = $heap->{port} || $Config->{ServerPort} || 7070;
 	
 	print "Server starts.\n";
-	create Haver::Utils::Logger    (logfile => $heap->{logfile});
+	create Haver::Utils::Logger    (logfile => $heap->{logfile} || '-');
 	create Haver::Server::Listener (port => $port);
 
 	$kernel->sig('INT' => 'intterrupt');
@@ -85,8 +112,15 @@ sub _start {
 }
 sub _stop {
 	print "Server stops.\n";
-	print "Total size of registry: ", total_size($Registry), "\n";
-	$Registry->save($_[HEAP]{confdir});
+
+	$Config->{Channels} = $Registry->list_ids('channel');
+
+	foreach my $chan ($Registry->list_vals('channel')) {
+		eval { $chan->save };
+		if ($@) {
+			warn "Can't save ".$chan->id.":\n$@";
+		}
+	}
 }
 
 sub die {
@@ -105,7 +139,7 @@ __END__
 
 =head1 NAME
 
-Haver::Server - Perl extension for blah blah blah
+Haver::Server - Haver chat server.
 
 =head1 SYNOPSIS
 

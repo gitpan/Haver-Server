@@ -20,21 +20,20 @@
 # TODO, write POD. Soon.
 package Haver::Server::Connection;
 use strict;
-use warnings;
+#use warnings;
 use Carp;
 use POE qw(
 	Wheel::ReadWrite
 	Driver::SysRW
 	Preprocessor
 );
-
-use Hash::Util qw(lock_keys);
-
+#use Hash::Util qw(lock_keys);
 use Haver::Protocol;
-use Haver::Protocol::Errors qw( %Errors   );
-use Haver::Server           qw( $Registry );
+use Haver::Server           qw( $Registry $Config );
 use Haver::Server::Commands;
 use Digest::SHA1 qw( sha1_base64 );
+
+our $RELOAD = 1;
 
 sub create {
 	my ($class, @args) = @_;
@@ -63,6 +62,7 @@ sub create {
 				'accept'    => 'on_accept',
 				'reject'    => 'on_reject',
 				'askpass'   => 'on_askpass',
+				'send_ping' => 'on_send_ping',
 			},
 			$C => $C->commands,
 		],
@@ -100,6 +100,8 @@ sub _start {
 
 	%$heap = (
 		timer       => $timer,
+		ping        => undef,
+		ping_time   => undef,
 		socket      => $sock,
 		address     => $address,
 		port        => $port,
@@ -111,7 +113,6 @@ sub _start {
 		user        => undef,
 		uid         => undef,
 	);
-	lock_keys(%$heap);
 
 	$kernel->yield('want', 'VERSION',
 		code => sub {
@@ -132,6 +133,12 @@ sub _default {
 
 
 	if ($event =~ s/^cmd_//) {
+		my $cmd = "cmd_$event";
+		if (my $code = Haver::Server::Commands->can($cmd)) {
+			$kernel->state($cmd, 'Haver::Server::Commands');
+			@_[ARG0 .. $#_] = @{ $_[ARG1] };
+			goto &$code;
+		}
 		$kernel->yield('warn', UCMD => $event);
 	}
 	$kernel->post('Logger', 'error', "Unknown event: $event");
@@ -141,24 +148,51 @@ sub _default {
 
 sub socket_input {
 	my ($kernel, $heap, $args) = @_[KERNEL, HEAP, ARG0];
-
-	$kernel->post('Logger', 'raw', join("\t", map { defined $_ ? $_ : '' } @$args));
+	
+	my @copy = @$args;
+	foreach (@copy) {
+		next unless defined;
+		#my @foo = split(//, $_);
+		#foreach my $c (@foo) {
+			#$c = ord($c);
+			#$c = "[$c]";
+		#}
+		#$_ = join('', @foo);
+		s/\e/<ESC>/g;
+		s/\r/<CR>/g;
+		s/\n/<LF>/g;
+		s/\t/<TAB>/g;
+	}
+	my $raw = join("\t", map { defined $_ ? $_ : '' } @copy);
+	$kernel->post('Logger', 'raw', $raw);
+	
 	return if $heap->{plonk};
 	return if $heap->{shutdown};
-	
+	if ($heap->{ping} && !$heap->{ping_time}) {
+		$kernel->alarm_remove($heap->{ping});
+		$heap->{ping} = $kernel->alarm_set(
+			'send_ping',
+			time + $Config->{PingTime});
+	}
 
+	my $want = 0;
 	my $cmd = shift @$args;
 
 	if ($heap->{want} and $cmd ne 'CANT') {
 		if ($cmd eq $heap->{want}) {
+			$want = 1;
 			$heap->{want} = undef;
 		} else {
-			$kernel->yield('die', WANT => $cmd);
+			$kernel->yield('die', 'WANT', $heap->{want}, $cmd);
 			return;
 		}
 	}
 
-	$kernel->yield("cmd_$cmd", $args);
+	if ($heap->{user} or $want) {
+		$kernel->yield("cmd_$cmd", $args);
+	} else {
+		$kernel->yield('die', 'SPEEDY');
+	}
 }
 sub socket_flush {
 	my ($kernel, $heap) = @_[KERNEL, HEAP];
@@ -183,9 +217,9 @@ sub on_send {
 }
 
 sub on_bye {
-	my ($kernel, $heap, $session, $type) = @_[KERNEL, HEAP, SESSION, ARG0, ARG1];
-	$kernel->call($session, 'send', ['BYE', $type]);
-	$kernel->yield('shutdown', $type);
+	my ($kernel, $heap, $session, @args) = @_[KERNEL, HEAP, SESSION, ARG0 .. $#_];
+	$kernel->call($session, 'send', ['BYE', @args]);
+	$kernel->yield('shutdown', @args);
 }
 sub on_want {
 	my ($kernel, $heap, $want, %opts) = @_[KERNEL, HEAP, ARG0 .. $#_];
@@ -200,7 +234,7 @@ sub on_want {
 		unless delete $opts{no_send};
 }
 sub on_shutdown {
-	my ($kernel, $heap, $type) = @_[KERNEL, HEAP, ARG0];
+	my ($kernel, $heap, @args) = @_[KERNEL, HEAP, ARG0 .. $#_];
 
 	if (!$heap->{shutdown}) {
 		$kernel->post('Logger', 'note', 'Shutting down client session.');
@@ -221,12 +255,20 @@ sub on_shutdown {
 			}
 			my %users = map { ($_ => $_) } @users;
 			foreach my $u (values %users) {
-				$u->send(['QUIT', $uid, $type]);
+				$u->send(['QUIT', $uid, @args]);
 			}
 		}
-		#if ($user) {
-		#	$user->save;
-		#}
+		if ($user) {
+			if ($user->password) {
+				eval {
+					$user->save;
+				};
+				if ($@) {
+					warn $@;
+				}
+			}
+			($heap->{port}, $heap->{address}) = $user->get('_port', '_address');
+		}
 
 	} else {
 		$kernel->post('Logger', 'error', 'Trying to shutdown more than once!');
@@ -236,26 +278,35 @@ sub on_shutdown {
 sub on_die {
 	my ($kernel, $heap, $err, @data) = @_[KERNEL, HEAP, ARG0 .. $#_];
 
-	exists $Errors{$err} or die "$err is not registered!";
 	$kernel->yield('send', ['DIE', $err, @data]);
-	$kernel->yield('bye', 'DIED');
+	$kernel->yield('bye', 'DIE');
 }
 sub on_warn {
 	my ($kernel, $heap, $err, @data) = @_[KERNEL, HEAP, ARG0 .. $#_];
 	
-	exists $Errors{$err} or die "$err is not registered!";
 	$kernel->yield('send', ['WARN', $err, @data]);
 }
 
 sub on_accept {
 	my ($kernel, $heap, $uid, $user) = @_[KERNEL, HEAP, ARG0, ARG1];
 
-	$kernel->alarm_remove($heap->{timer});
-	$heap->{timer} = undef;
+	$kernel->alarm_remove(delete $heap->{timer});
+	$heap->{ping} = $kernel->alarm_set(
+		'send_ping',
+		time + $Config->{PingTime});
+	$heap->{ping_time} = undef;
+	
 
 	$Registry->add($user);
 	$heap->{user} = $user;
 	$heap->{uid}  = $uid;
+	my $addr = join('.', (split(/\./, $heap->{address}))[0,1,2]) . '.*';
+	$user->set(
+		_address  => delete $heap->{address},
+		_port     => delete $heap->{port},
+		address   => $addr,
+		version   => delete $heap->{want_data}{version},
+	);
 
 
 	$kernel->yield('send', ['ACCEPT', $uid]);
@@ -263,7 +314,6 @@ sub on_accept {
 sub on_reject {
 	my ($kernel, $heap, $uid, $err) = @_[KERNEL, HEAP, ARG0, ARG1];
 
-	exists $Errors{$err} or die "$err is not registered!";
 	$kernel->yield('send', ['REJECT', $uid, $err]);
 	$kernel->yield('want', 'UID',
 		code => sub {
@@ -286,6 +336,18 @@ sub on_askpass {
 			$kernel->yield('die', WANT => 'PASS');
 		},
 	);
+}
+
+sub on_send_ping {
+	my ($kernel, $heap) = @_[KERNEL, HEAP];
+
+	my $time = time;
+	$kernel->yield('send', ['PING', $time]);
+	$heap->{ping} = $kernel->alarm_set(
+		'bye', time + $Config->{PingTime}, 'PING');
+	$heap->{ping_time} = $time;
+
+	$kernel->post('Logger', 'note', "Sending PING: $time");
 }
 
 1;

@@ -2,8 +2,9 @@ package Haver::Server::Channel;
 use strict;
 use warnings;
 
+use Haver::Server::Object;
 use Haver::Server::Object::Index;
-use base ('Haver::Server::Object::Index');
+use base qw( Haver::Server::Object Haver::Server::Object::Index );
 
 our $VERSION = '0.02';
 

@@ -17,28 +17,67 @@
 # Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package Haver::Server::Registry;
 use strict;
-use warnings;
+#use warnings;
 
 use Haver::Singleton;
 use Haver::Server::Object::Index;
-
 use base qw( Haver::Singleton Haver::Server::Object::Index );
+use POE;
 
-our $VERSION = '0.02';
+our $VERSION = '0.03';
+our $RELOAD = 1;
 
 sub initialize {
 	my ($me) = @_;
-	$me->{id} = 'registry';
-	
-	# XXX Hello, I am a HACK! somebody please FIXME!
-	Haver::Server::Object::Index->can('initialize')->(@_);
-}
-sub namespace {
-	'registry';
-}
-sub filename {
-	$Haver::Server::Object::DataDir . '/' . 'registry';
+	POE::Session->create(
+		object_states => [
+			$me => {
+				_start => 'on_start',
+				_stop  => 'on_stop',
+				map { ($_ => "on_$_") } qw(
+					send
+				),
+			},
+		],
+	);
 }
 
+sub on_start {
+	my ($me, $kernel, $heap) = @_[OBJECT, KERNEL, HEAP];
+	warn "Registry starts.\n";
+	$kernel->alias_set('Registry');
+
+	if (exists $Haver::Server::Feature{IKC}) {
+		$kernel->post('IKC', 'publish', 'Registry', [qw(
+				send
+			)]
+		);
+	}
+
+}
+
+sub on_stop {
+	my ($me, $kernel, $heap) = @_[OBJECT, KERNEL, HEAP];
+	warn "Registry stops.\n"
+}
+
+sub on_send {
+	my ($me, $kernel, $heap, $args) = @_[OBJECT, KERNEL, HEAP, ARG0];
+	my $targ = shift @$args;
+	
+	if (my $obj = $me->resolve($targ)) {
+		$kernel->post($obj->sid, 'send', $args);
+	} else {
+		$kernel->post('Logger', 'error', "Can't send event to $targ!");
+	}
+}
+
+
+sub resolve {
+	my ($me, $thing) = @_;
+	my ($ns, $id) = split('/', $thing, 2);
+
+	return $me->fetch($ns, $id);
+}
 
 1;

@@ -20,23 +20,26 @@
 # TODO, write POD. Soon.
 package Haver::Server::Commands;
 use strict;
-use warnings;
+#use warnings;
+
 use Carp;
 use POE;
 use POE::Preprocessor;
 
-use Haver::Server qw( $Registry );
+use Haver::Server qw( $Registry $Config );
 use Haver::Protocol::Errors qw( %Errors   );
 use Digest::SHA1 qw(sha1_base64);
 
+our $RELOAD = 1;
 our @Commands = qw(
 	UID PASS VERSION CANT
 	MSG ACT PMSG PACT
 	JOIN PART QUIT
 	USERS CHANS PONG
+	MAKE RELOAD LOAD PANG
+	KILL REHASH NUTS
 );
 
-const PING_TIME  (1 * 60)
 macro assert_channel(myCid) {
 	return unless defined myCid;
 	($poe_kernel->yield('warn', CID_NOT_FOUND => myCid), return)
@@ -78,7 +81,7 @@ sub cmd_UID {
 		id  => $uid,
 		sid => $ses->ID,
 	);
-	eval { $user->load($Registry->get_field('DataDir')) };
+	eval { $user->load($Config->{StoreDir}) };
 
 	if (not $Registry->contains(user => $uid)) {
 		unless ($user->password) {
@@ -183,7 +186,7 @@ sub cmd_PART {
 
 	{% assert_channel $cid %}
 
-	if ($user->is_subscribed($cid)) {
+	if ($user->contains('channel', $cid)) {
 		my $chan = $Registry->fetch('channel', $cid);
 		$chan->send(['PART', $cid, $uid]);
 		$chan->remove($user);
@@ -210,8 +213,13 @@ sub cmd_USERS {
 	my $user = $heap->{user};
 	my $uid  = $heap->{uid};
 
-	{% assert_channel $cid %}
-	my $chan = $Registry->fetch('channel', $cid);
+	my $chan;
+	if ($cid ne '*') {
+		{% assert_channel $cid %}
+		$chan = $Registry->fetch('channel', $cid);
+	} else {
+		$chan = $Registry;
+	}
 
 
 	$kernel->yield('send', ['USERS', $cid, $chan->list_ids('user')]);
@@ -245,7 +253,112 @@ macro make_PCMD(CMD) {
 # PONG($data)
 sub cmd_PONG {
 	my ($kernel, $heap, $args) = @_[KERNEL, HEAP, ARG0];
-
+	my $time = $args->[0];
+	if (defined $heap->{ping_time}) {
+		if ($time eq $heap->{ping_time}) {
+			$kernel->alarm_remove($heap->{ping});
+			$heap->{ping} = $kernel->alarm_set('send_ping',
+				time + $Config->{PingTime});
+			$heap->{ping_time} = undef;
+		} else {
+			$kernel->yield('bye', 'BAD PING');
+		}
+	} else {
+		$kernel->yield('die', 'UNEXPECTED_PONG');
+	}
 }
+
+# PONG($data)
+sub cmd_PANG {
+	my ($kernel, $heap, $args) = @_[KERNEL, HEAP, ARG0];
+	my $time = $args->[0];
+	$kernel->alarm_remove(delete $heap->{ping});
+	delete $heap->{ping_time};
+}
+
+# MAKE($cid)
+sub cmd_MAKE {
+	my ($kernel, $heap, $args) = @_[KERNEL, HEAP, ARG0];
+	my $user = $heap->{user};
+	my $cid  = $args->[0];
+
+	unless ($user->has('@make')) {
+		$kernel->yield('warn', UCMD => 'MAKE');
+		return;
+	}
+
+	unless ($Registry->contains('channel', $cid)) {
+		my $chan = new Haver::Server::Channel(id => $cid);
+		$Registry->add($chan);
+		$kernel->yield('send', ['OK', 'MAKE', $cid]);
+	} else {
+		$kernel->yield('warn', CID_IN_USE => $cid);
+	}
+}
+
+sub cmd_RELOAD {
+	my ($kernel, $heap, $args) = @_[KERNEL, HEAP, ARG0];
+	my $user = $heap->{user};
+
+	unless ($user->has('@reload')) {
+		$kernel->yield('warn', UCMD => 'RELOAD');
+		return;
+	}
+
+	my @mods = Haver::Reload->reload;
+	foreach my $mod (@mods) {
+		$kernel->post('Logger', 'note', "Reloaded $mod");
+	}
+}
+
+sub cmd_LOAD {
+	my ($kernel, $heap, $args) = @_[KERNEL, HEAP, ARG0];
+	my $user = $heap->{user};
+	my $mod  = $args->[0];
+
+	unless ($user->has('@load')) {
+		$kernel->yield('warn', UCMD => 'LOAD');
+		return;
+	}
+
+	Haver::Reload->load($mod);
+}
+
+sub cmd_KILL {
+	my ($kernel, $heap, $args) = @_[KERNEL, HEAP, ARG0];
+	my $user   = $heap->{user};
+	my $victim = $args->[0];
+
+	unless ($user->has('@kill')) {
+		$kernel->yield('warn', UCMD => 'KILL');
+		return;
+	}
+	
+	{% assert_user $victim %};
+	my $v = $Registry->fetch('user', $victim);
+	$kernel->post($v->sid, 'bye', 'KILL', $heap->{uid});
+}
+
+sub cmd_REHASH {
+	my ($kernel, $heap, $args) = @_[KERNEL, HEAP, ARG0];
+	my $user   = $heap->{user};
+	my $victim = $args->[0];
+
+	unless ($user->has('@rehash')) {
+		$kernel->yield('warn', UCMD => 'REHASH');
+		return;
+	}
+	$Config->reload;
+}
+
+sub cmd_NUTS {
+	my ($kernel, $heap, $args) = @_[KERNEL, HEAP, ARG0];
+	my $n = $args->[0] || 10;
+
+	foreach my $nut (1 .. $n) {
+		$heap->{user}->send(['JOIN', 'lobby', "hamster-$nut"]);
+	}
+}
+
 
 1;

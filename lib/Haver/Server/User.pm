@@ -20,8 +20,10 @@ use strict;
 use warnings;
 use Carp;
 
+
+use Haver::Server::Object;
 use Haver::Server::Object::Index;
-use base 'Haver::Server::Object::Index';
+use base qw( Haver::Server::Object Haver::Server::Object::Index );
 
 our $VERSION = '0.03';
 
@@ -66,7 +68,6 @@ sub namespace {
 }
 sub send {
 	my ($me, @msgs) = @_;
-
 	$POE::Kernel::poe_kernel->post($me->{sid}, 'send', @msgs);
 }
 
@@ -78,6 +79,11 @@ sub password {
 	} else {
 		$me->{password} = $pass;
 	}
+}
+
+sub sid {
+	my ($me) = @_;
+	return $me->{sid};
 }
 
 1;

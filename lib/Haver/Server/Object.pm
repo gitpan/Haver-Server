@@ -24,6 +24,7 @@ use POE::Preprocessor;
 use Haver::Base;
 use base 'Haver::Base';
 use YAML ();
+use File::Basename ();
 
 # Perms:
 #  w = set
@@ -39,7 +40,6 @@ use YAML ();
 #  l = listed in WHOIS.
 our $VERSION = "0.01";
 our $ID = 1;
-our $DataDir = './store';
 
 our %Access = (
 	config    => {
@@ -97,9 +97,11 @@ sub field_type {
 sub initialize {
 	my ($me) = @_;
 
+	my $config = eval { instance Haver::Config } || {};
 	$me->{_fields}   = {};
 	$me->{_perms}    = {};
 	$me->{_flags}    = {};
+	$me->{directory} = $config->{StoreDir} || './store';
 	$me->{id}      ||= $ID++;
 
 
@@ -111,6 +113,7 @@ sub save {
 	my ($me) = @_;
 	my %f = %{ $me->{_fields} };
 	my @del = grep { ! $me->has_flag($_, 'p') } keys %f;
+	my $file = $me->filename;
 	delete @f{@del};
 
 	my %save = (
@@ -119,26 +122,35 @@ sub save {
 		flags  => $me->{_flags},
 		ID     => $me->{id},
 		NS     => $me->namespace,
+		Class  => ref($me),
 	);
 	$me->on_save(\%save);
-
-	print "DEBUG: Saving " . $me->filename, "\n";
-	YAML::DumpFile($me->filename, \%save);
+	
+	my $path = (File::Basename::fileparse($file))[1];
+	mkdir($path) or die "Can't mkdir($path): $!" unless -d $path;
+	
+	print "DEBUG: Saving $file\n";
+	open my $fh, ">$file" or die "Can't open $file for writing: $!";
+	print $fh YAML::Dump(\%save);
+	close $fh;
 }
 sub load {
 	my ($me) = @_;
 	my $file = $me->filename;
-	my $data = YAML::LoadFile($file);
+	local $/ = undef;
+	my $data;
+
+	open my $fh, "<$file" or die "Can't open $file for reading: $!";
+	$data = readline($fh);
+	close $fh;
+	$data = YAML::Load($data);
 	
 	$me->{_fields} = $data->{fields};
 	$me->{_flags}  = $data->{flags};
 	$me->{_perms}  = $data->{perms};
 	
-	if ($data->{NS} ne $me->namespace) {
-		die "Can't load $file. "
-	}
 	
-	print "DEBUG: Loading " . $me->filename, "\n";
+	print "DEBUG: Loading $file\n";
 	$me->on_load($data);
 }
 
@@ -156,9 +168,17 @@ sub id        {
 sub namespace {
 	'object'
 }
+sub directory {
+	my ($me, $dir) = @_;
+	if (@_ == 2) {
+		$me->{directory} = $dir;
+	} else {
+		$me->{directory}
+	}
+}
 sub filename {
 	my ($me) = @_;
-	return $DataDir . '/' . $me->namespace . '/' . $me->id;
+	return $me->directory . '/' . $me->namespace . '/' . $me->id;
 }
 sub send      {
 	croak "Must define send method!" 
@@ -216,14 +236,14 @@ sub del_perms {
 }
 
 ### Methods for accessing fields.
-sub set_field {
+sub set {
 	my ($me, @set) = @_;
 	
 	while (my ($k,$v) = splice(@set, 0, 2)) {
 		$me->{_fields}{$k} = $v;
 	}
 }
-sub get_field {
+sub get {
 	my ($me, @keys) = @_;
 
 	if (@keys <= 1) {
@@ -237,7 +257,7 @@ sub get_field {
 
 	return wantarray ? @values : \@values ;
 }
-sub has_field {
+sub has {
 	my ($me, @keys) = @_;
 
 	if (@keys <= 1) {
@@ -252,7 +272,7 @@ sub has_field {
 
 	return 1;
 }
-sub del_field {
+sub del {
 	my ($me, @keys) = @_;
 	
 	if (@keys <= 1) {
@@ -267,7 +287,7 @@ sub del_field {
 	
 	return wantarray ? @values : \@values ;
 }
-sub list_fields {
+sub list_keys {
 	my ($me) = @_;
 	return keys %{ $me->{_fields} };
 }

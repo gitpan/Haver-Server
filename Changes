@@ -1,0 +1,170 @@
+2004-03-05  dylanwh <dylanwh@tampabay.rr.com>
+
+	* test-server.pl, lib/Haver/Server.pm,
+	lib/Haver/Server/Commands.pm, lib/Haver/Server/Connection.pm: Many
+	changes...
+
+2004-02-29  dylanwh <dylanwh@tampabay.rr.com>
+
+	* NEWS, lib/Haver/Server.pm, lib/Haver/Server/Commands.pm,
+	lib/Haver/Server/Connection.pm, lib/Haver/Server/Registry.pm,
+	lib/Haver/Server/User.pm: Haver::Server has updates for
+	Haver::Config to work.	Haver::Server::Commands now has PANG, KILL,
+	RELOAD, and LOAD.  Haver::Server::Connection, I fixed some bug.
+	forget what it was...  The Registry I'm working on, adding features
+	for sending things...  Haver::Server::User now has a ->sid method
+	to access its session id.
+	
+	Added a NEWS file.
+
+2004-02-29  dylanwh <dylanwh@tampabay.rr.com>
+
+	* README, test-server.pl, lib/Haver/Server.pm,
+	lib/Haver/Server/Commands.pm: Foo.
+
+2004-02-29  dylanwh <dylanwh@tampabay.rr.com>
+
+	* .cvsignore, Build.PL, bin/haver-gen-base.pl, bin/haverd.pl,
+	lib/Haver/Server.pm, lib/Haver/Server/Commands.pm,
+	lib/Haver/Server/Connection.pm, lib/Haver/Server/Object.pm,
+	lib/Haver/Server/Registry.pm, lib/Haver/Server/User.pm,
+	lib/Haver/Server/Object/Index.pm: Various changes. Getting ready
+	for 0.05.
+
+2004-02-27  dylanwh <dylanwh@tampabay.rr.com>
+
+	* Build.PL, bin/haverd.pl, lib/Haver/Server.pm,
+	lib/Haver/Server/Channel.pm, lib/Haver/Server/Commands.pm,
+	lib/Haver/Server/Connection.pm, lib/Haver/Server/Object.pm,
+	lib/Haver/Server/Registry.pm, lib/Haver/Server/User.pm,
+	lib/Haver/Server/Object/Index.pm: Many things...
+
+2004-02-22  dylanwh <dylanwh@tampabay.rr.com>
+
+	* .cvsignore, MANIFEST: Removed MANIFEST files from CVS.
+
+2004-02-22  dylanwh <dylanwh@tampabay.rr.com>
+
+	* Build.PL, COPYING, MANIFEST.SKIP, lib/Haver/Server.pm, t/basic.t,
+	t/test-1.pl: We're switching to Module::Build now.
+
+2004-02-22  dylanwh <dylanwh@tampabay.rr.com>
+
+	* Build.PL, Makefile.PL: Switching to Build.PL instead of
+	Makefile.PL
+
+2004-02-22  dylanwh <dylanwh@tampabay.rr.com>
+
+	* MANIFEST, MANIFEST.SKIP, lib/Haver/Server.pm,
+	lib/Haver/Server/Object.pm, lib/Haver/Server/Registry.pm,
+	lib/Haver/Server/Object/Index.pm: Fixed some MANIFEST.SKIP bugs.
+
+2004-02-22  dylanwh <dylanwh@tampabay.rr.com>
+
+	* MANIFEST, MANIFEST.SKIP, lib/Haver/Server.pm,
+	lib/Haver/Server/Object.pm: Eh, fixed a few small bugs.
+
+2004-02-22  dylanwh <dylanwh@tampabay.rr.com>
+
+	* lib/Haver/Server/Channel.pm, lib/Haver/Server/Registry.pm,
+	lib/Haver/Server/User.pm, lib/Haver/Server/Object/Container.pm,
+	lib/Haver/Server/Object/Index.pm: Renamed Container to Index.
+
+2004-02-21  dylanwh <dylanwh@tampabay.rr.com>
+
+	* Makefile.PL, README, bin/haverd.pl, lib/Haver/Server.pm,
+	lib/Haver/Server/Commands.pm, lib/Haver/Server/Connection.pm:
+	Getting ready to release 0.04 "Vinegar"!
+
+2004-02-21  dylanwh <dylanwh@tampabay.rr.com>
+
+	* .cvsignore, MANIFEST.SKIP, lib/Haver/Server.pm,
+	lib/Haver/Server/Commands.pm, lib/Haver/Server/Connection.pm,
+	lib/Haver/Server/Listener.pm, lib/Haver/Server/Object.pm,
+	lib/Haver/Server/Registry.pm, lib/Haver/Server/User.pm: Lots of new
+	changes... passwords work now. Split off cmd_* stuff into
+	Commands.pm
+
+2004-02-21  dylanwh <dylanwh@tampabay.rr.com>
+
+	* lib/Haver/Server/Object/Container.pm: foo.
+
+2004-02-21  dylanwh <dylanwh@tampabay.rr.com>
+
+	* Makefile.PL, bin/haverd.pl, lib/Haver/Server.pm,
+	lib/Haver/Server/Channel.pm, lib/Haver/Server/Connection.pm,
+	lib/Haver/Server/Listener.pm, lib/Haver/Server/Object.pm,
+	lib/Haver/Server/Registry.pm, lib/Haver/Server/User.pm: Generalized
+	container stuff in Server::Object::Container, generalized
+	Server::Registry as a Container, same with Server::User and
+	Server::Channel.
+	
+	All startup logic is now in Server.pm.	haverd.pl is just a
+	wrapper.
+
+2004-02-19  dylanwh <dylanwh@tampabay.rr.com>
+
+	* .cvsignore: Added Changes to various .cvsignore files.
+
+2004-02-19  dylanwh <dylanwh@tampabay.rr.com>
+
+	* MANIFEST, bin/haverd.pl, lib/Haver/Server/Channel.pm,
+	lib/Haver/Server/Connection.pm, lib/Haver/Server/Object.pm,
+	lib/Haver/Server/User.pm: Removed Changes files. They should have
+	never been in CVS.  Also made various changes. Probably I broke
+	something, but I'm too tired to test... CVS verions of things are
+	supposed to be broken anyway. ;)
+
+2004-02-17  dylanwh <dylanwh@tampabay.rr.com>
+
+	* lib/Haver/Server.pm: nothing important.
+
+2004-02-17  dylanwh <dylanwh@tampabay.rr.com>
+
+	* bin/haverd.pl, lib/Haver/Server/Connection.pm: PING support is
+	now missing.  But QUIT now exists.
+
+2004-02-16  dylanwh <dylanwh@tampabay.rr.com>
+
+	* lib/Haver/Server/Channel.pm, lib/Haver/Server/Connection.pm,
+	lib/Haver/Server/User.pm: Made the client's output more JRC-like.
+
+2004-02-16  dylanwh <dylanwh@tampabay.rr.com>
+
+	* lib/Haver/Server/Connection.pm, lib/Haver/Server/User.pm: Server
+	now sends PINGs and expects PONGs, about every two minutes. There
+	might be bugs, though.
+	
+	I reorganized accept and reject code into two different events of
+	the same names.
+	
+	I also made it illegal (REJECT-able, that is) for the client to
+	just send 'UID'.
+
+2004-02-16  dylanwh <dylanwh@tampabay.rr.com>
+
+	* .cvsignore: Added .cvsignore files.
+
+2004-02-15  bdonlan <bdonlan@bd-home-comp.no-ip.org>
+
+	* MANIFEST, MANIFEST.SKIP: Add MANIFEST.bak and META.yml to
+	MANIFEST.SKIP
+
+2004-02-15  dylanwh <dylanwh@tampabay.rr.com>
+
+	* MANIFEST, MANIFEST.SKIP, lib/Haver/Server.pm: Fixed manifest
+	files.
+
+2004-02-15  dylanwh <dylanwh@tampabay.rr.com>
+
+	* Makefile.PL, bin/haverd.pl: We're re-organizing the directory
+	structure, so it is more modular.
+
+2004-02-15  dylanwh <dylanwh@tampabay.rr.com>
+
+	* MANIFEST, Makefile.PL, README, lib/Haver/Server.pm,
+	lib/Haver/Server/Channel.pm, lib/Haver/Server/Connection.pm,
+	lib/Haver/Server/Listener.pm, lib/Haver/Server/Object.pm,
+	lib/Haver/Server/Registry.pm, lib/Haver/Server/User.pm,
+	t/test-1.pl: Commiting server.
+
