@@ -1,0 +1,15 @@
+bin/haverd.pl
+Changes
+lib/Haver/Server.pm
+lib/Haver/Server/Channel.pm
+lib/Haver/Server/Connection.pm
+lib/Haver/Server/Listener.pm
+lib/Haver/Server/Object.pm
+lib/Haver/Server/Registry.pm
+lib/Haver/Server/User.pm
+MANIFEST			This list of files
+MANIFEST.bak
+MANIFEST.SKIP
+META.yml
+README
+t/test-1.pl

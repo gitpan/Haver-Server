@@ -1,0 +1,6 @@
+Revision history for Perl extension Haver::Server.
+
+0.01  Sun Feb 15 21:13:51 2004
+	- original version; created by h2xs 1.23 with options
+		-XA --name=Haver::Server
+

@@ -1,0 +1,35 @@
+bin/CVS/Entries
+bin/CVS/Repository
+bin/CVS/Root
+bin/haverd.pl
+Changes
+CVS/Entries
+CVS/Repository
+CVS/Root
+lib/CVS/Entries
+lib/CVS/Repository
+lib/CVS/Root
+lib/Haver/CVS/Entries
+lib/Haver/CVS/Repository
+lib/Haver/CVS/Root
+lib/Haver/Server.pm
+lib/Haver/Server/Channel.pm
+lib/Haver/Server/Connection.pm
+lib/Haver/Server/CVS/Entries
+lib/Haver/Server/CVS/Repository
+lib/Haver/Server/CVS/Root
+lib/Haver/Server/Listener.pm
+lib/Haver/Server/Object.pm
+lib/Haver/Server/Registry.pm
+lib/Haver/Server/User.pm
+Makefile
+Makefile.PL
+MANIFEST			This list of files
+MANIFEST.bak
+MANIFEST.skip
+README
+t/CVS/Entries
+t/CVS/Repository
+t/CVS/Root
+t/test-1.pl
+META.yml                                 Module meta-data (added by MakeMaker)
