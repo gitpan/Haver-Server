@@ -18,59 +18,27 @@
 # Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 
 # TODO, write POD. Soon.
-
 package Haver::Server::Connection;
 use strict;
 use warnings;
 use Carp;
-use POE;
-use POE::Filter::Line;
-use POE::Filter::Stackable;
-use POE::Wheel::ReadWrite;
-use POE::Driver::SysRW;
-use POE::Preprocessor;
-
-use Haver::Protocol;
-use Haver::Server::Registry;
-use Haver::Server::User;
-use Haver::Server::Channel;
+use POE qw(
+	Wheel::ReadWrite
+	Driver::SysRW
+	Preprocessor
+);
 
 use Hash::Util qw(lock_keys);
 
-
-my %Errors = (
-	EWANT           => 'want unsatisfied',
-	ECANT_WRONG     => 'cant on unwanted thing',
-	EUID_IN_USE     => 'uid is in use',
-	EBUG            => 'this should never happen',
-	ECMD            => 'unknown command',
-	ECID_NOT_FOUND  => 'unknown channel id',
-	EUID_NOT_FOUND  => 'unknown user id',
-	EALREADY_JOINED => 'already joined to channel',
-	ENOT_JOINED     => 'not joined to channel',
-	EINVALID_UID    => 'invalid uid',
-);
-
-our @Commands ;
-
-my $Registry = ();
-
-macro assert_channel(myCid) {
-	return unless defined myCid;
-	($poe_kernel->yield('warn', ECID_NOT_FOUND => myCid), return)
-		unless $Registry->has_channel(myCid);
-}
-
-macro assert_user(myUid) {
-	return unless defined myUid;
-	($poe_kernel->yield('warn', EUID_NOT_FOUND => myUid), return)
-		unless $Registry->has_user(myUid);
-}
-
-const PING_TIME  (1 * 60)
+use Haver::Protocol;
+use Haver::Protocol::Errors qw( %Errors   );
+use Haver::Server           qw( $Registry );
+use Haver::Server::Commands;
+use Digest::SHA1 qw( sha1_base64 );
 
 sub create {
 	my ($class, @args) = @_;
+	my $C = "Haver::Server::Commands";
 
 	POE::Session->create(
 		package_states => [ 
@@ -89,31 +57,20 @@ sub create {
 				'send'      => 'on_send',
 				'want'      => 'on_want',
 				'shutdown'  => 'on_shutdown',
-				'close'     => 'on_close',
+				'bye'     => 'on_bye',
 				'warn'      => 'on_warn',
 				'die'       => 'on_die',
 				'accept'    => 'on_accept',
 				'reject'    => 'on_reject',
-#				'send_ping' => 'on_send_ping',
-
-				# User states
-				map { ("cmd_$_" => "cmd_$_") } qw(
-					UID VERSION CANT
-					MSG ACT
-					PMSG PACT
-					JOIN PART
-					CHANS USERS
-					PONG QUIT
-				),
-			}
+				'askpass'   => 'on_askpass',
+			},
+			$C => $C->commands,
 		],
-		heap => {},
+		heap => {
+		},
 		args => \@args,
 	);
-
-	$Registry = instance Haver::Server::Registry;
 }
-
 
 sub _start {
 	my ($heap, $session, $kernel, $socket, $address, $port ) = 
@@ -123,7 +80,8 @@ sub _start {
     $kernel->post('Logger', 'note',  'Socket Birth');
 	$kernel->post('Logger', 'note', "Connection from ${address}:$port");
 
-	
+
+	binmode $socket, ":utf8";
 	my $sock = new POE::Wheel::ReadWrite(
 		Handle => $socket,
 		Driver => new POE::Driver::SysRW,
@@ -135,155 +93,140 @@ sub _start {
 
 
 	my $timer = $kernel->alarm_set(
-		'close', 
+		'bye', 
 		time + 20,
 		'TIMEOUT',
 	);
 
 	%$heap = (
-		TIMEOUT       => $timer,
-		SOCKET        => $sock,
-		ADDRESS       => $address,
-		PORT          => $port,
-		SHUTDOWN      => 0,
-		PLONK        => 0,
-		WANT          => undef,
-		CANT_ACTION   => undef, # called if CANT $WANT...
-		VERSION       => undef,
-		USER          => undef,
-		UID           => undef,
-		PINGOUT       => undef,
-		PING          => undef,
+		timer       => $timer,
+		socket      => $sock,
+		address     => $address,
+		port        => $port,
+		shutdown    => 0,
+		plonk       => 0,
+		want        => undef,
+		want_data   => undef, # called if CANT $WANT...
+		version     => undef,
+		user        => undef,
+		uid         => undef,
 	);
 	lock_keys(%$heap);
 
-	$kernel->yield('want', 'VERSION', sub {
-			$kernel->yield('close', 'CANT VERSION');
+	$kernel->yield('want', 'VERSION',
+		code => sub {
+			$kernel->yield('bye', 'CANT VERSION');
 		}
 	);
 
 }
-
-
 sub _stop {
 	my ($kernel, $heap, $session) = @_[KERNEL, HEAP, SESSION];
 
-	print "STOPPING CONNECTION\n";
-	my ($address, $port) = @$heap{qw(ADDRESS PORT)};
+	my ($address, $port) = @$heap{qw(address port)};
     $kernel->call('Logger', 'note',  'Socket Death');
 	$kernel->call('Logger', 'note', "Lost connection from ${address}:$port");
 }
-
-
 sub _default {
 	my ($kernel, $heap, $event, $args) = @_[KERNEL, HEAP, ARG0, ARG1];
 
 
 	if ($event =~ s/^cmd_//) {
-		$kernel->yield('warn', ECMD => $event);
+		$kernel->yield('warn', UCMD => $event);
 	}
 	$kernel->post('Logger', 'error', "Unknown event: $event");
 
 	return 0;
 }
 
-
-
-
-
-
-
-
 sub socket_input {
 	my ($kernel, $heap, $args) = @_[KERNEL, HEAP, ARG0];
 
 	$kernel->post('Logger', 'raw', join("\t", map { defined $_ ? $_ : '' } @$args));
-	return if $heap->{PLONK};
+	return if $heap->{plonk};
+	return if $heap->{shutdown};
 	
 
 	my $cmd = shift @$args;
 
-	if ($heap->{WANT} and $cmd ne 'CANT') {
-		if ($cmd eq $heap->{WANT}) {
-			$heap->{WANT} = undef;
-			$heap->{CANT_ACTION} = undef;
+	if ($heap->{want} and $cmd ne 'CANT') {
+		if ($cmd eq $heap->{want}) {
+			$heap->{want} = undef;
 		} else {
-			$kernel->yield('die', EWANT => $cmd);
+			$kernel->yield('die', WANT => $cmd);
 			return;
 		}
 	}
 
 	$kernel->yield("cmd_$cmd", $args);
 }
-
 sub socket_flush {
 	my ($kernel, $heap) = @_[KERNEL, HEAP];
 
-	if ($heap->{SHUTDOWN}) {
-		$heap->{SOCKET} = undef;
+	if ($heap->{shutdown}) {
+		$heap->{socket} = undef;
 	}
 }
-
 sub socket_error {
 	my ($kernel, $heap, $operation, $errnum, $errstr) = @_[KERNEL, HEAP, ARG0..ARG3];
 
 	$kernel->post('Logger', 'error', 
 		"Socket generated $operation error ${errnum}: $errstr");
 
-	$heap->{SOCKET} = undef;
+	$heap->{socket} = undef;
 	$kernel->yield('shutdown', 'DISCON');
 }
 
-
-
 sub on_send {
 	my ($kernel, $heap, @msgs) = @_[KERNEL, HEAP, ARG0 .. $#_];
-	$heap->{SOCKET}->put(@msgs) if $heap->{SOCKET};
+	$heap->{socket}->put(@msgs) if $heap->{socket};
 }
 
-sub on_close {
+sub on_bye {
 	my ($kernel, $heap, $session, $type) = @_[KERNEL, HEAP, SESSION, ARG0, ARG1];
-	$kernel->call($session, 'send', ['CLOSE', $type]);
+	$kernel->call($session, 'send', ['BYE', $type]);
 	$kernel->yield('shutdown', $type);
 }
-
 sub on_want {
-	my ($kernel, $heap, $want, $code, $no_send) = @_[KERNEL, HEAP, ARG0 .. $#_];
+	my ($kernel, $heap, $want, %opts) = @_[KERNEL, HEAP, ARG0 .. $#_];
 
 	$want =~ s/\W//g;
 	$want = uc $want;
 
-	$heap->{WANT} = $want;
-	$heap->{CANT_ACTION} = $code;
-	$kernel->yield('send', ['WANT', $want]) unless $no_send;
+	$heap->{want} = $want;
+	$heap->{want_data} = \%opts;
+	my @args = $opts{args} ? @{$opts{args}} : ();
+	$kernel->yield('send', ['WANT', $want, @args])
+		unless delete $opts{no_send};
 }
-
 sub on_shutdown {
 	my ($kernel, $heap, $type) = @_[KERNEL, HEAP, ARG0];
 
-	if (!$heap->{SHUTDOWN}) {
+	if (!$heap->{shutdown}) {
 		$kernel->post('Logger', 'note', 'Shutting down client session.');
-		my $user = $heap->{USER};
-		my $uid  = $heap->{UID};
-		$heap->{SHUTDOWN} = 1;
-		$heap->{PLONK} = 1;
-		$heap->{USER} = undef;
-		$heap->{UID} = undef;
+		my $user = $heap->{user};
+		my $uid  = $heap->{uid};
+		$heap->{shutdown} = 1;
+		$heap->{plonk} = 1;
+		$heap->{user} = undef;
+		$heap->{uid} = undef;
 		
 		$kernel->alarm_remove_all();
-		if ($Registry->remove_user($uid)) {
+		if ($uid && $Registry->remove('user', $uid)) {
 			my @users = ();
-			foreach my $chan ($user->subscriptions_by_val) {
-				$user->unsubscribe($chan);
+			foreach my $chan ($user->list_vals('channel')) {
+				$user->remove($chan);
 				$chan->remove($user);
-				push(@users, $chan->users_by_val);
+				push(@users, $chan->list_vals('user'));
 			}
 			my %users = map { ($_ => $_) } @users;
 			foreach my $u (values %users) {
 				$u->send(['QUIT', $uid, $type]);
 			}
 		}
-		
+		#if ($user) {
+		#	$user->save;
+		#}
 
 	} else {
 		$kernel->post('Logger', 'error', 'Trying to shutdown more than once!');
@@ -291,207 +234,58 @@ sub on_shutdown {
 }
 
 sub on_die {
-	my ($kernel, $heap, $err, $data) = @_[KERNEL, HEAP, ARG0, ARG1];
+	my ($kernel, $heap, $err, @data) = @_[KERNEL, HEAP, ARG0 .. $#_];
 
-	my $emsg = $Errors{$err} or die "No description for $err!";
-	$kernel->yield('send', ['DIE', $err, $data, $emsg]);
-	$kernel->yield('close', 'DIED');
+	exists $Errors{$err} or die "$err is not registered!";
+	$kernel->yield('send', ['DIE', $err, @data]);
+	$kernel->yield('bye', 'DIED');
 }
-
 sub on_warn {
-	my ($kernel, $heap, $err, $data) = @_[KERNEL, HEAP, ARG0, ARG1];
-	$data ||= '';
+	my ($kernel, $heap, $err, @data) = @_[KERNEL, HEAP, ARG0 .. $#_];
 	
-	my $emsg = $Errors{$err} or die "No description for $err!";
-	$kernel->yield('send', ['WARN', $err, $data, $emsg]);
+	exists $Errors{$err} or die "$err is not registered!";
+	$kernel->yield('send', ['WARN', $err, @data]);
 }
 
 sub on_accept {
 	my ($kernel, $heap, $uid, $user) = @_[KERNEL, HEAP, ARG0, ARG1];
-	
-	$Registry->add_user($user);
-	$heap->{USER} = $user;
-	$heap->{UID}  = $uid;
+
+	$kernel->alarm_remove($heap->{timer});
+	$heap->{timer} = undef;
+
+	$Registry->add($user);
+	$heap->{user} = $user;
+	$heap->{uid}  = $uid;
+
 
 	$kernel->yield('send', ['ACCEPT', $uid]);
 }
-
 sub on_reject {
 	my ($kernel, $heap, $uid, $err) = @_[KERNEL, HEAP, ARG0, ARG1];
-	my $emsg = $Errors{$err} or die "No description for $err!";
 
-	$kernel->yield('send', ['REJECT', $uid, $err, $emsg]);
-	$kernel->yield('want', 'UID', sub {
-			$kernel->yield('close', 'CANT UID');
-		}, 1 # don't send another 'WANT', the client already knows this.
+	exists $Errors{$err} or die "$err is not registered!";
+	$kernel->yield('send', ['REJECT', $uid, $err]);
+	$kernel->yield('want', 'UID',
+		code => sub {
+			$kernel->yield('bye', 'CANT UID');
+		},
+		no_send => 1,
 	);
-
 }
 
-sub cmd_CANT {
-	my ($kernel, $heap, $args) = @_[KERNEL, HEAP, ARG0];
-	my $want = $args->[0];
+sub on_askpass {
+	my ($kernel, $heap, $uid, $user) = @_[KERNEL, HEAP, ARG0, ARG1];
+	my $salt = sprintf("%f%x%o", rand(), time, $$);
 	
-	if ($want eq $heap->{WANT}) {
-		if (my $code = $heap->{CANT_ACTION}) {
-			$code->($kernel, $heap);
-		}
-		$heap->{WANT} = undef;
-		$heap->{CANT_ACTION} = undef;
-	} else {
-		$kernel->yield('die', ECANT_WRONG => $want);
-	}
-}
-
-
-sub cmd_VERSION {
-	my ($kernel, $heap, $args) = @_[KERNEL, HEAP, ARG0];
-	my $ver = $args->[0];
-
-	if ($ver) {
-		$heap->{VERSION} = $ver;
-		$kernel->yield('want', 'UID', sub {
-				$kernel->yield('close', 'CANT UID');
-			}
-		);
-	} else {
-		$kernel->yield('die', EBADVER => $ver);
-	}
-}
-
-sub cmd_UID {
-	my ($kernel, $heap, $args, $ses) = @_[KERNEL, HEAP, ARG0, SESSION];
-	my $uid = $args->[0];
-	
-	return if $heap->{UID};
-	
-	unless (Haver::Server::User->valid_uid($uid)) {
-		$kernel->yield('reject', $uid, 'EINVALID_UID');
-		return;
-	}
-	
-	my $user = new Haver::Server::User(
-		uid  => $uid,
-		sid => $ses->ID,
+	$kernel->yield('want', 'PASS',
+		args    => [$salt],
+		salt    => $salt,
+		user    => $user,
+		uid     => $uid,
+		code    => sub {
+			$kernel->yield('die', WANT => 'PASS');
+		},
 	);
-
-	if (not $Registry->has_user($uid)) {
-		$kernel->alarm_remove($heap->{TIMEOUT});
-		$heap->{TIMEOUT} = undef;
-		$kernel->yield('accept', $uid, $user);
-	} else {
-		$kernel->yield('reject', $uid, 'EUID_IN_USE');
-	}
-}
-
-
-# MSG($cid, $msg)
-# ACT($cid, $msg)
-macro make_CMD(CMD) {
-	sub cmd_CMD {
-		my ($kernel, $heap, $args) = @_[KERNEL, HEAP, ARG0];
-		my $user = $heap->{USER};
-		my $cid = $args->[0];
-		my $msg = $args->[1];
-
-		{% assert_channel $cid %}
-	
-		my $chan = $Registry->fetch_channel($cid);
-		$chan->send(['CMD', $cid, $heap->{UID}, $msg]);
-	}
-}
-
-{% make_CMD MSG %}
-{% make_CMD ACT %}
-
-
-# JOIN($cid)
-sub cmd_JOIN {
-	my ($kernel, $heap, $args) = @_[KERNEL, HEAP, ARG0];
-	my $cid  = $args->[0];
-	my $user = $heap->{USER};
-	my $uid  = $heap->{UID};
-	
-	{% assert_channel $cid %}
-
-	unless ($user->is_subscribed($cid)) {
-		my $chan = $Registry->fetch_channel($cid);
-		$chan->add($user);
-		$user->subscribe($chan);
-		$chan->send(['JOIN', $cid, $uid]);
-	} else {
-		$kernel->yield('warn', EALREADY_JOINED => $cid);
-	}
-}
-
-# PART($cid)
-sub cmd_PART {
-	my ($kernel, $heap, $args) = @_[KERNEL, HEAP, ARG0];
-	my $cid = $args->[0];
-	my $user = $heap->{USER};
-	my $uid  = $heap->{UID};
-
-	{% assert_channel $cid %}
-
-	if ($user->is_subscribed($cid)) {
-		my $chan = $Registry->fetch_channel($cid);
-		$chan->send(['PART', $cid, $uid]);
-		$chan->remove($user);
-		$user->unsubscribe($chan);
-	} else {
-		$kernel->yield('warn', ENOT_JOINED => $cid);
-	}
-}
-
-# CHANS()
-sub cmd_CHANS {
-	my ($kernel, $heap) = @_[KERNEL, HEAP];
-
-	$kernel->yield('send', ['CHANS', $Registry->list_channels_by_id]);
-}
-
-sub cmd_USERS {
-	my ($kernel, $heap, $args) = @_[KERNEL, HEAP, ARG0];
-	my $cid = $args->[0];
-	my $user = $heap->{USER};
-	my $uid  = $heap->{UID};
-
-	{% assert_channel $cid %}
-	my $chan = $Registry->fetch_channel($cid);
-
-	$kernel->yield('send', ['USERS', $cid, $chan->users_by_id]);
-}
-
-# PMSG($uid, $msg)
-# PACT($uid, $msg)
-macro make_PCMD(CMD) {
-	sub cmd_CMD {
-		my ($kernel, $heap, $args) = @_[KERNEL, HEAP, ARG0];
-		my $target_uid = $args->[0];
-		my $user       = $heap->{USER};
-		my $uid        = $heap->{UID};
-
-		{% assert_user $target_uid %}
-		my $target = $Registry->fetch_user($target_uid);
-
-		$target->send(['CMD', $uid, $args->[1]]);
-	}
-}
-
-{% make_PCMD PMSG %}
-{% make_PCMD PACT %}
-
-# QUIT
-sub cmd_QUIT {
-	my ($kernel, $heap) = @_[KERNEL, HEAP];
-
-	$kernel->yield('close', 'ACTIVE');
-}
-
-# PONG($data)
-sub cmd_PONG {
-	my ($kernel, $heap, $args) = @_[KERNEL, HEAP, ARG0];
-
 }
 
 1;

@@ -1,3 +1,57 @@
+2004-02-21  dylanwh <dylanwh@tampabay.rr.com>
+
+	* Makefile.PL, README, bin/haverd.pl, lib/Haver/Server.pm,
+	lib/Haver/Server/Commands.pm, lib/Haver/Server/Connection.pm:
+	Getting ready to release 0.04 "Vinegar"!
+
+2004-02-21  dylanwh <dylanwh@tampabay.rr.com>
+
+	* .cvsignore, MANIFEST.SKIP, lib/Haver/Server.pm,
+	lib/Haver/Server/Commands.pm, lib/Haver/Server/Connection.pm,
+	lib/Haver/Server/Listener.pm, lib/Haver/Server/Object.pm,
+	lib/Haver/Server/Registry.pm, lib/Haver/Server/User.pm: Lots of new
+	changes... passwords work now. Split off cmd_* stuff into
+	Commands.pm
+
+2004-02-21  dylanwh <dylanwh@tampabay.rr.com>
+
+	* lib/Haver/Server/Object/Container.pm: foo.
+
+2004-02-21  dylanwh <dylanwh@tampabay.rr.com>
+
+	* Makefile.PL, bin/haverd.pl, lib/Haver/Server.pm,
+	lib/Haver/Server/Channel.pm, lib/Haver/Server/Connection.pm,
+	lib/Haver/Server/Listener.pm, lib/Haver/Server/Object.pm,
+	lib/Haver/Server/Registry.pm, lib/Haver/Server/User.pm: Generalized
+	container stuff in Server::Object::Container, generalized
+	Server::Registry as a Container, same with Server::User and
+	Server::Channel.
+	
+	All startup logic is now in Server.pm.	haverd.pl is just a
+	wrapper.
+
+2004-02-19  dylanwh <dylanwh@tampabay.rr.com>
+
+	* .cvsignore: Added Changes to various .cvsignore files.
+
+2004-02-19  dylanwh <dylanwh@tampabay.rr.com>
+
+	* MANIFEST, bin/haverd.pl, lib/Haver/Server/Channel.pm,
+	lib/Haver/Server/Connection.pm, lib/Haver/Server/Object.pm,
+	lib/Haver/Server/User.pm: Removed Changes files. They should have
+	never been in CVS.  Also made various changes. Probably I broke
+	something, but I'm too tired to test... CVS verions of things are
+	supposed to be broken anyway. ;)
+
+2004-02-17  dylanwh <dylanwh@tampabay.rr.com>
+
+	* lib/Haver/Server.pm: nothing important.
+
+2004-02-17  dylanwh <dylanwh@tampabay.rr.com>
+
+	* bin/haverd.pl, lib/Haver/Server/Connection.pm: PING support is
+	now missing.  But QUIT now exists.
+
 2004-02-16  dylanwh <dylanwh@tampabay.rr.com>
 
 	* lib/Haver/Server/Channel.pm, lib/Haver/Server/Connection.pm,
@@ -8,10 +62,10 @@
 	* lib/Haver/Server/Connection.pm, lib/Haver/Server/User.pm: Server
 	now sends PINGs and expects PONGs, about every two minutes. There
 	might be bugs, though.
-
+	
 	I reorganized accept and reject code into two different events of
 	the same names.
-
+	
 	I also made it illegal (REJECT-able, that is) for the client to
 	just send 'UID'.
 

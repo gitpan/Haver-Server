@@ -16,29 +16,28 @@
 # You should have received a copy of the GNU General Public License
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
-#iiiiiii
 use strict;
 use warnings;
-$|++;
-#sub POE::Kernel::TRACE_REFCNT () { 1 }
-use POE;
-use Haver::Server::Listener ;
-use Haver::Utils::Logger;
-use Haver::Server::Registry;
+use Haver::Server;
+use Getopt::Long;
+my $logfile  = '-';
+my $confdir  = './store';
+my $daemon   = 0;
+my $port;
 
-my $Registry = instance Haver::Server::Registry;
-$Registry->add_channel(
-	new Haver::Server::Channel(cid => 'lobby')
+GetOptions (
+	"logfile=s"   => \$logfile,
+	"confdir=s"   => \$confdir,
+	'daemon'      => \$daemon,
+	'port=i'      => \$port,
 );
-for (1 .. 5) {
-	$Registry->add_channel(
-		new Haver::Server::Channel(cid => "spoon-$_")
-	);
-}
 
+my $chan = new Haver::Server::Channel(id => 'lobby');
+Haver::Server::Registry->instance->add($chan);
 
-create Haver::Utils::Logger ;
-create Haver::Server::Listener (shift || 7070);
-
-
-$poe_kernel->run();
+Haver::Server->boot(
+	logfile => $logfile,
+	confdir => $confdir,
+	$port ? (port => $port) : (),
+	daemon  => $daemon,
+);

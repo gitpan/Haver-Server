@@ -15,101 +15,73 @@
 # You should have received a copy of the GNU General Public License
 # along with this module; if not, write to the Free Software
 # Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
-
 package Haver::Server::User;
 use strict;
 use warnings;
 use Carp;
 
-#use POE::Preprocessor;
-use base 'Haver::Server::Object';
+use Haver::Server::Object::Container;
+use base 'Haver::Server::Object::Container';
 
-our $VERSION = "0.001";
-our $UID = 1;
-
-
-sub initialize {
-	my ($me) = @_;
-
-	$me->{uid}      ||= 'user'.$UID++;
-	$me->{cid_list}   = {};
-
-	
-	croak "session id (sid) required!" unless $me->{sid};
-	$POE::Kernel::poe_kernel->refcount_increment($me->{sid}, __PACKAGE__);
-}
+our $VERSION = '0.03';
 
 sub valid_uid {
 	my ($this, $uid) = @_;
 
-	if (defined $uid && $uid ne '.' && $uid =~ /^[A-Za-z _'\.-]+$/) {
+	if (defined $uid && $uid =~ /^[a-z][a-z0-9' _\.-]+$/) {
 		return 1;
 	} else {
 		return 0;
 	}
 }
 
+sub initialize {
+	my ($me) = shift;
+
+	$me->SUPER::initialize(@_);
+	$POE::Kernel::poe_kernel->refcount_increment($me->{sid}, __PACKAGE__) if $me->{sid};
+}
 sub finalize {
-	my ($me) = @_;
-	$POE::Kernel::poe_kernel->refcount_decrement($me->{sid}, __PACKAGE__);
+	my ($me) = shift;
+	$me->SUPER::finalize(@_);
+	$POE::Kernel::poe_kernel->refcount_decrement($me->{sid}, __PACKAGE__) if $me->{sid};
 }
 
-sub uid {
-	return $_[0]{uid};
+sub on_save {
+	my ($me, $save) = @_;
+	if (exists $me->{password}) {
+		$save->{password} = $me->{password};
+	}
 }
+sub on_load {
+	my ($me, $data) = @_;
 
-#use Data::Dumper;
-sub send {
-	my ($me, @msgs) = @_;
-
-	#print "-- msg --\n";
-	#print Dumper($msgs[0]);
-	#print "-- end --\n";
-	
-	
-	$POE::Kernel::poe_kernel->post($me->{sid}, 'send', @msgs);
-}
-
-sub subscribe {
-	my ($me, $chan) = @_;
-
-	unless ($me->is_subscribed($chan->cid)) {
-		$me->{cid_list}{$chan->cid} = $chan;
-	} else {
-		return undef;
+	if (exists $data->{password}) {
+		$me->{password} = $data->{password};
 	}
 }
 
-sub unsubscribe {
-	my ($me, $chan) = @_;
-	my $cid = ref $chan ? $chan->cid : $chan;
+sub namespace {
+	'user'
+}
+sub send {
+	my ($me, @msgs) = @_;
 
-	delete $me->{cid_list}{$cid};
+	$POE::Kernel::poe_kernel->post($me->{sid}, 'send', @msgs);
 }
 
-sub is_subscribed {
-	my ($me, $chan) = @_;
-	my $cid = ref $chan ? $chan->cid : $chan;
+sub password {
+	my ($me, $pass) = @_;
 
-	return exists $me->{cid_list}{$cid};
-}
-
-sub subscriptions_by_val {
-	my ($me) = @_;
-	my $h = $me->{cid_list};
-
-	return wantarray ? values %{ $h } : [ values %{ $h } ];
-}
-
-sub subscriptions_by_id {
-	my ($me) = @_;
-	my $h = $me->{cid_list};
-
-	return wantarray ? keys %{ $h } : [ keys %{ $h } ];
+	unless (@_ == 2) {
+		return $me->{password};
+	} else {
+		$me->{password} = $pass;
+	}
 }
 
 1;
-
+__END__
 =head1 NAME
 
 Haver::Server::User - Object representation of a user.

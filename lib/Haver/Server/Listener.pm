@@ -34,7 +34,7 @@ use POE qw(
 use Haver::Server::Connection;
 
 sub create {
-	my ($class) = shift;
+	my ($class, %opts) = @_;
 	POE::Session->create(
 		package_states => 
 		[
@@ -46,15 +46,19 @@ sub create {
 			]
 		],
 		heap => {
+			port => $opts{port},
 		},
 		args => [@_],
 	);
 }
 
 sub _start {
-	my ($kernel, $heap, $port) = @_[KERNEL, HEAP, ARG0];
+	my ($kernel, $heap) = @_[KERNEL, HEAP];
+	my $port = $heap->{port};
+	
 
-	$kernel->post('Logger', 'note', "Listener Birth on port $port");
+	print STDERR "Listener starts.\n";
+	$kernel->post('Logger', 'note', "Listening on port $port.");
 
 	$heap->{listener} = POE::Wheel::SocketFactory->new(
 		#BindAddress  => '127.0.0.1',
@@ -63,15 +67,14 @@ sub _start {
 		SuccessEvent => 'socket_birth',
 		FailureEvent => 'socket_fail',
 	);
+	$kernel->alias_set('Listener');
 }
-
 sub _stop {
     my ($kernel, $heap) = @_[KERNEL,HEAP];
 	delete $heap->{listener};
 	delete $heap->{session};
-	$kernel->post('Logger', 'note', 'Listener Death');
+	print STDERR "Listener stops.\n";
 }
-
 
 sub socket_birth {
     my ($kernel, $socket, $address, $port) = @_[ KERNEL, ARG0, ARG1, ARG2 ];
@@ -79,10 +82,12 @@ sub socket_birth {
 
 	create Haver::Server::Connection ($socket, $address, $port);
 }
-
-
 sub socket_fail {
 	die "Bad things!!!";
+}
+
+sub shutdown {
+	$_[KERNEL]->alias_remove('Listener');
 }
 
 1;

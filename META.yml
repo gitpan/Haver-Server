@@ -1,11 +1,14 @@
 # http://module-build.sourceforge.net/META-spec.html
 #XXXXXXX This is a prototype!!!  It will change in the future!!! XXXXX#
 name:         Haver-Server
-version:      0.03
+version:      0.04
 version_from: lib/Haver/Server.pm
 installdirs:  site
 requires:
+    Digest::SHA1:                  2.01
+    Haver:                         0.04
     POE:                           0.27
+    YAML:                          0.35
 
 distribution_type: module
 generated_by: ExtUtils::MakeMaker version 6.17

@@ -2,77 +2,26 @@ package Haver::Server::Channel;
 use strict;
 use warnings;
 
-use Haver::Server;
-use base     ('Haver::Server::Object');
+use Haver::Server::Object::Container;
+use base ('Haver::Server::Object::Container');
 
-our $VERSION = "0.001";
+our $VERSION = '0.02';
 
-sub initialize {
-	my ($me) = @_;
-
-	die unless exists $me->{cid};
-
-	$me->{userlist} = {};
+sub namespace {
+	return 'channel';
 }
-
-sub cid {
-	my ($me) = @_;
-
-	return $me->{cid};
+sub can_contain {
+	my ($me, $obj) = @_;
+	
+	!$obj->isa(__PACKAGE__);
 }
-
-#use Data::Dumper;
 sub send {
 	my $me = shift;
-	#print "-- c-msg --\n";
-	#print Dumper($_[0]);
-	#print "-- c-end --\n";
 
-
-	foreach my $user ($me->users_by_val) {
+	foreach my $user ($me->list_vals('user')) {
 		$user->send(@_);
 	}
 }
 
-
-sub add {
-	my ($me, $user) = @_;
-	my $uid = $user->uid;
-	
-	unless ($me->contains($user)) {
-		return $me->{userlist}{$uid} = $user;
-	} else {
-		return 0;
-	}
-}
-
-sub remove {
-	my ($me, $user) = @_;
-	my $uid = ref $user ? $user->uid : $user;
-
-	delete $me->{userlist}{$uid};
-}
-
-sub contains {
-	my ($me, $user) = @_;
-	my $uid = ref $user ? $user->uid : $user;
-
-	return exists $me->{userlist}{$uid};
-}
-
-
-sub users_by_val {
-	my ($me)  = @_;
-	my @users = values %{ $me->{userlist} };
-
-	return wantarray ? @users : \@users;
-}
-
-sub users_by_id {
-	my ($me)  = @_;
-	my @users = keys %{ $me->{userlist} };
-
-	return wantarray ? @users : \@users;
-}
 
 1;
