@@ -20,70 +20,79 @@ use strict;
 use warnings;
 use Carp;
 
-use POE::Preprocessor;
+use Fatal qw(:void open close opendir closedir);
+use POE::Kernel             qw( $poe_kernel );
 use Haver::Base;
-use base 'Haver::Base';
-use YAML ();
-use File::Basename ();
+use Haver::Preprocessor;
 
-# Perms:
-#  w = set
-#  r = get
-#  h = has
-#  d = del
-# 
+use YAML           (); # Load, Dump
+use File::Basename (); # fileparse
+use File::Spec;
+use Scalar::Util   (); # weaken
+use File::Path ();
+# Subclass Haver::Savable
+use base 'Haver::Savable';
+
+use overload (
+	'==' => 'equals',
+	'""' => 'as_string',
+	fallback => 1,
+);
 
 # Flags:
-#  p = persistent
-#  a = ACL permision.
-#  b = broadcast
-#  l = listed in WHOIS.
-our $VERSION = "0.01";
-our $ID = 1;
+#  p = persistent : saved in userfile
+#  l = locked     : user can't change
 
-our %Access = (
-	config    => {
-		OWNER => 'rwhd',
-		ANY   => '',
-	},
-	broadcast => {
-		OWNER => 'rwhd',
-		ANY   => 'rh',
-	},
-	perms    => {
-		OWNER => 'rh',
-		ANY   => 'rh',
-	},
-	option    => {
-		OWNER => 'rwhd',
-		ANY   => 'rh',
-	},
-	tag       => {
-		OWNER => '',
-		ANY   => '',
-	},
-	normal    => {
-		OWNER => 'rwhd',
-		ANY   => 'hd',
-	},
-);
+# Public variables:
+our $RELOAD  = 1;
+our $VERSION = "0.04";
 our %Flags = (
-	broadcast => 'b',
-	normal    => 'p',
-	perms     => 'apb',
-	tag       => 'p',
-	option    => 'p',
-	config    => 'p',
+	broadcast => 'p',
+	public    => 'p',
+	private   => 'p',
+	secret    => 'l',
+	flag      => '',
+	attrib    => 'pl',
 );
 our %Types = (
-	'.'  => 'config',
+	# '' => 'public',
 	'+'  => 'broadcast',
-	'@'  => 'perms',
-	'-'  => 'option',
-	'_'  => 'tag'
+	'.'  => 'private',
+	'_'  => 'secret',
+	'-'  => 'flag',
+	'@'  => 'attrib',
 );
+our $IdPattern = qr/[a-z][a-z0-9_' -]+/;
+
+# Private class variables:
+# We use ||= instead of = so that this module may be reloaded.
+my $ID        ||= 1;
+my $StoreDir  ||= './store';
+
 
 ### Class methods.
+## Validation methods
+sub is_valid_tag {
+	my ($me, $tag) = @_;
+
+	my $word = $IdPattern;
+	unless ($tag =~ /^$word\/$word$/) {
+		return 1;
+	} else {
+		return 0;
+	}
+}
+
+sub is_valid_id {
+	my ($this, $uid) = @_;
+
+	if (defined $uid && $uid =~ /^$IdPattern$/) {
+		return 1;
+	} else {
+		return 0;
+	}
+}
+
 sub field_type {
 	my ($this, $f) = @_;
 	my ($char) = $f =~ /^([^a-zA-Z0-9])/;
@@ -91,100 +100,81 @@ sub field_type {
 	if (defined $char) {
 		return $Types{$char};
 	} else {
-		return 'normal';
+		return 'public';
 	}
 }
+
+sub store_dir {
+	my ($class, $dir) = @_;
+	ASSERT: not ref $class;
+
+	if (@_ == 1) {
+		return $StoreDir;
+	} else {
+		return $StoreDir = $dir;
+	}
+}
+
+sub namespace { 'object'  } 
+
+
+### Object methods
 sub initialize {
 	my ($me) = @_;
 
-	my $config = eval { instance Haver::Config } || {};
-	$me->{_fields}   = {};
-	$me->{_perms}    = {};
-	$me->{_flags}    = {};
-	$me->{directory} = $config->{StoreDir} || './store';
-	$me->{id}      ||= $ID++;
+	$me->SUPER::initialize();
 
-
+	$me->{_fields}    = {};
+	$me->{_flags}     = {};
+	$me->{id}       ||= $ID++;
+	
+	if (exists $me->{wheel}) {
+		Scalar::Util::weaken($me->{wheel});
+	}
 	return $me;
 }
 
+## Helper methods for POE-ness.
+sub post {
+	my $me = shift;
 
-sub save {
-	my ($me) = @_;
-	my %f = %{ $me->{_fields} };
-	my @del = grep { ! $me->has_flag($_, 'p') } keys %f;
-	my $file = $me->filename;
-	delete @f{@del};
-
-	my %save = (
-		fields => \%f,
-		perms  => $me->{_perms},
-		flags  => $me->{_flags},
-		ID     => $me->{id},
-		NS     => $me->namespace,
-		Class  => ref($me),
-	);
-	$me->on_save(\%save);
-	
-	my $path = (File::Basename::fileparse($file))[1];
-	mkdir($path) or die "Can't mkdir($path): $!" unless -d $path;
-	
-	print "DEBUG: Saving $file\n";
-	open my $fh, ">$file" or die "Can't open $file for writing: $!";
-	print $fh YAML::Dump(\%save);
-	close $fh;
-}
-sub load {
-	my ($me) = @_;
-	my $file = $me->filename;
-	local $/ = undef;
-	my $data;
-
-	open my $fh, "<$file" or die "Can't open $file for reading: $!";
-	$data = readline($fh);
-	close $fh;
-	$data = YAML::Load($data);
-	
-	$me->{_fields} = $data->{fields};
-	$me->{_flags}  = $data->{flags};
-	$me->{_perms}  = $data->{perms};
-	
-	
-	print "DEBUG: Loading $file\n";
-	$me->on_load($data);
+	croak "Can not post. session id is not defined!" unless defined $me->{sid};
+	$poe_kernel->post($me->{sid}, @_);
 }
 
-sub on_save {
-	my ($me, $save) = @_;
-} 
-sub on_load {
-	my ($me, $data) = @_;
+sub send {
+	my $me = shift;
+	
+	croak "Can not send. Wheel undefined!" unless defined $me->{wheel};
+	$me->{wheel}->put(@_);
 }
 
-### Accessor methods.
-sub id        {
-	$_[0]{id}
-}
-sub namespace {
-	'object'
-}
-sub directory {
-	my ($me, $dir) = @_;
+
+
+
+## Accessor methods.
+sub id {
+	my ($me, $val) = @_;
+
 	if (@_ == 2) {
-		$me->{directory} = $dir;
+		return $me->{id} = $val;
 	} else {
-		$me->{directory}
+		return $me->{id};
 	}
 }
+
 sub filename {
 	my ($me) = @_;
-	return $me->directory . '/' . $me->namespace . '/' . $me->id;
-}
-sub send      {
-	croak "Must define send method!" 
+	return File::Spec->catfile($StoreDir, $me->namespace, $me->id);
 }
 
-### Flag methods
+sub directory {
+	my ($me) = @_;
+
+	return File::Spec->catdir($StoreDir, $me->namespace);
+}
+
+## Flag methods
 sub get_flags {
 	my ($me, $key) = @_;
 
@@ -198,6 +188,19 @@ sub set_flags {
 	my ($me, $key, $value) = @_;
 	$me->{_flags}{$key} = $value;
 }
+
+sub has_flags {
+	my ($me, $key, $flags) = @_;
+	
+	for my $flag (split(//, $flags)) {
+		unless ($me->has_flag($key, $flag)) {
+			return 0;
+		}
+	}
+	
+	return 1;
+}
+
 sub has_flag {
 	my ($me, $key, $flag) = @_;
 	my $s = $me->get_flags($key);
@@ -206,36 +209,7 @@ sub has_flag {
 	return index($s, $flag) != -1;
 }
 
-### Permision methods. 
-sub get_perms {
-	my ($me, $key) = @_;
-
-	if (exists $me->{_perms}{$key}) {
-		return $me->{_perms}{$key};
-	} else {
-		return $Access{ $me->field_type($key) };
-	}
-}
-sub set_perms {
-	my ($me, $key, %set) = @_;
-
-	unless (exists $me->{_perms}{$key}) {
-		$me->{_perms}{$key} = $Access{ $me->field_type($key) };
-	}
-	
-	foreach my $k (keys %set) {
-		$me->{_perms}{$key}{$k} = $set{$k};
-	}
-}
-sub del_perms {
-	my ($me, $key, @keys) = @_;
-
-	foreach my $k (@keys) {
-		delete $me->{_perms}{$key}{$k};
-	}
-}
-
-### Methods for accessing fields.
+## Methods for accessing fields.
 sub set {
 	my ($me, @set) = @_;
 	
@@ -278,20 +252,70 @@ sub del {
 	if (@keys <= 1) {
 		return delete $me->{_fields}{$keys[0]};
 	}
-	my @values;
 	
 	foreach my $key (@keys) {
-		push(@values, delete $me->{_fields}{$key});
+		delete $me->{_fields}{$key};
 	}
 	
 	
-	return wantarray ? @values : \@values ;
+	return 1;
 }
-sub list_keys {
+sub list_fields {
 	my ($me) = @_;
 	return keys %{ $me->{_fields} };
 }
 
+
+
+sub _save_data {
+	my ($me) = @_;
+	my (%fields, %flags);
+	my %data = (
+		Class  => ref($me),
+		ID     => $me->id,
+		NS     => $me->namespace,
+		fields => \%fields,
+		flags => \%flags
+	);
+
+	foreach my $f ($me->list_fields) {
+		if ($me->has_flag($f, 'p')) {
+			$fields{$f} = $me->{_fields}{$f};
+		}
+	}
+	%flags = %{ $me->{_flags} };
+
+	File::Path::mkpath($me->directory);
+	return \%data;
+}
+
+sub _load_data {
+	my ($me, $data) = @_;
+	
+	no warnings;
+	ASSERT: $data->{ID}    eq $me->id;
+	ASSERT: $data->{NS}    eq $me->namespace;
+	ASSERT: $data->{Class} eq ref($me);
+	use warnings;
+
+	$me->{_fields} = delete $data->{fields};
+	$me->{_flags}  = delete $data->{flags};
+
+	1;
+}
+
+## Operator overload methods
+sub equals {
+	my ($me, $what) = @_;
+	return undef unless $what->can('namespace') && $what->can('id');
+	return (($me->namespace eq $what->namespace) and ($me->id eq $what->id));
+}
+
+sub as_string {
+	my ($me) = @_;
+
+	return $me->namespace . '/' . $me->id;
+}
 
 1;
 =head1 NAME

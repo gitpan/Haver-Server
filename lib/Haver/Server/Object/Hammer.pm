@@ -1,4 +1,4 @@
-# Haver::Server::User - OO User object thing.
+# Haver::Server::Object::Hammer - OO Hammer object thing.
 # 
 # Copyright (C) 2004 Dylan William Hardison
 #
@@ -15,89 +15,85 @@
 # You should have received a copy of the GNU General Public License
 # along with this module; if not, write to the Free Software
 # Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
-package Haver::Server::User;
+package Haver::Server::Object::Hammer;
 use strict;
 use warnings;
 use Carp;
 
 
 use Haver::Server::Object;
-use Haver::Server::Object::Index;
-use base qw( Haver::Server::Object Haver::Server::Object::Index );
+use base qw( Haver::Server::Object::Grantable );
 
-our $VERSION = '0.03';
+our $VERSION = '0.04';
+our $AUTOLOAD;
 
-sub valid_uid {
-	my ($this, $uid) = @_;
 
-	if (defined $uid && $uid =~ /^[a-z][a-z0-9' _\.-]+$/) {
-		return 1;
-	} else {
-		return 0;
-	}
-}
+sub namespace { 'hammer' }
 
 sub initialize {
 	my ($me) = shift;
 
 	$me->SUPER::initialize(@_);
-	$POE::Kernel::poe_kernel->refcount_increment($me->{sid}, __PACKAGE__) if $me->{sid};
-}
-sub finalize {
-	my ($me) = shift;
-	$me->SUPER::finalize(@_);
-	$POE::Kernel::poe_kernel->refcount_decrement($me->{sid}, __PACKAGE__) if $me->{sid};
+	$me->{user} or croak "Need user object!";
+
+	$me->{home}   ||= 'object/limbo';
+	$me->{owner}  ||= 'object/nobody';
 }
 
-sub on_save {
-	my ($me, $save) = @_;
-	if (exists $me->{password}) {
-		$save->{password} = $me->{password};
+sub has {
+	my ($me, @keys) = @_;
+
+	return $me->SUPER::has(@keys) || $me->{user}->has(@keys);
+}
+
+sub get {
+	my ($me, @keys) = @_;
+	my @values;
+
+	foreach my $k (@keys) {
+		push(@values, $me->SUPER::get($k) || $me->{user}->get($k));
+	}
+	
+	return @values;
+}
+
+
+BEGIN { 
+	no strict 'refs';
+	foreach my $sub (qw( home owner user )) {
+		*{$sub} = sub {
+			my ($me, $val) = @_;
+			if (@_ == 2) {
+				return $me->{$sub} = $val;
+			} else {
+				return $me->{$sub};
+			}
+		};
 	}
 }
-sub on_load {
-	my ($me, $data) = @_;
 
-	if (exists $data->{password}) {
-		$me->{password} = $data->{password};
-	}
-}
 
-sub namespace {
-	'user'
-}
-sub send {
-	my ($me, @msgs) = @_;
-	$POE::Kernel::poe_kernel->post($me->{sid}, 'send', @msgs);
-}
 
-sub password {
-	my ($me, $pass) = @_;
-
-	unless (@_ == 2) {
-		return $me->{password};
-	} else {
-		$me->{password} = $pass;
-	}
-}
-
-sub sid {
-	my ($me) = @_;
-	return $me->{sid};
-}
+#sub AUTOLOAD {
+#	my $me = shift;
+#	my $method = (split("::", $AUTOLOAD))[-1];
+#
+#	$me->{user}->$method(@_);
+#}
 
 1;
 __END__
 =head1 NAME
 
-Haver::Server::User - Object representation of a user.
+Haver::Server::Object::Hammer - Object representation of a user.
 
 =head1 SYNOPSIS
 
-  use Haver::Server::User;
+  use Haver::Server::Object::Hammer;
   my %opts = (); # No options at this time...
   my $uid  = 'rob';
-  my $user = new Haver::Server::User($uid, %opts);
+  a
+  my $user = new Haver::Server::Object::Hammer($uid, %opts);
   
   $user->uid eq $uid; # True
   $user->set(nick => "Roberto");

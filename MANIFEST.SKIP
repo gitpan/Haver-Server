@@ -1,7 +1,11 @@
 \.old$
-CVS
 \.bak
 store
 blib
 _build
 ^Build$
+^\.#
+\.svn
+\.tar\.gz$
+^data
+^conf

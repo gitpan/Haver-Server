@@ -21,6 +21,8 @@ use strict;
 
 use Haver::Singleton;
 use Haver::Server::Object::Index;
+use Haver::Server::Globals qw( %Feature );
+
 use base qw( Haver::Singleton Haver::Server::Object::Index );
 use POE;
 
@@ -35,49 +37,44 @@ sub initialize {
 				_start => 'on_start',
 				_stop  => 'on_stop',
 				map { ($_ => "on_$_") } qw(
-					send
+					spoof
 				),
 			},
 		],
 	);
 }
 
+
+sub resolve {
+	my ($me, $tag) = @_;
+	my ($ns, $id) = split('/', $tag, 2);
+	return undef unless defined $ns and defined $id;
+
+	return $me->fetch($ns, $id);
+}
+
+sub on_spoof {
+	my ($me, $kernel, $heap, $args) = @_[OBJECT, KERNEL, HEAP, ARG0];
+	my ($targ, $msg) = @$args;
+
+	if (my $user = $me->resolve($targ)) {
+		$user->send($msg);
+	}
+}
+
+
 sub on_start {
 	my ($me, $kernel, $heap) = @_[OBJECT, KERNEL, HEAP];
 	warn "Registry starts.\n";
 	$kernel->alias_set('Registry');
 
-	if (exists $Haver::Server::Feature{IKC}) {
-		$kernel->post('IKC', 'publish', 'Registry', [qw(
-				send
-			)]
-		);
-	}
-
+	#if ($Feature{IKC}) {
+	#}
 }
 
 sub on_stop {
 	my ($me, $kernel, $heap) = @_[OBJECT, KERNEL, HEAP];
 	warn "Registry stops.\n"
-}
-
-sub on_send {
-	my ($me, $kernel, $heap, $args) = @_[OBJECT, KERNEL, HEAP, ARG0];
-	my $targ = shift @$args;
-	
-	if (my $obj = $me->resolve($targ)) {
-		$kernel->post($obj->sid, 'send', $args);
-	} else {
-		$kernel->post('Logger', 'error', "Can't send event to $targ!");
-	}
-}
-
-
-sub resolve {
-	my ($me, $thing) = @_;
-	my ($ns, $id) = split('/', $thing, 2);
-
-	return $me->fetch($ns, $id);
 }
 
 1;

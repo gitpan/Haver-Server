@@ -1,6 +1,4 @@
 #!/usr/bin/perl
-# haverd.pl, This is a haver-compatible server.
-# This really doesn't do much, except load a few modules and start everything.
 # Copyright (C) 2003 Dylan William Hardison
 #
 # This program is free software; you can redistribute it and/or modify
@@ -16,27 +14,23 @@
 # You should have received a copy of the GNU General Public License
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
+
+
 use strict;
 use warnings;
-BEGIN {
-	$Haver::Preprocessor::ASSERT = 1;
-	$Haver::Preprocessor::DUMP = 1;
-	$Haver::Preprocessor::DEBUG = 1;
-	$Haver::Preprocessor::VERBOSE = 1;
-}
+use YAML qw(LoadFile DumpFile);
+use Digest::SHA1 qw(sha1_base64);
 
-use Haver::Server;
-use Getopt::Long;
-my $confdir = './conf';
-my $datadir = './data';
+my $file = shift or die "usage: $0 file";
+my $data = LoadFile($file);
 
-GetOptions (
-	"confdir=s" => \$confdir,
-	"datadir=s" => \$datadir,
-);
+print "Password: ";
+my $pass = readline STDIN;
+chomp $pass;
+
+$data->{password} = sha1_base64($pass);
 
 
-Haver::Server->boot(
-	confdir => $confdir,
-	datadir => $datadir,
-);
+DumpFile($file, $data);
+
+

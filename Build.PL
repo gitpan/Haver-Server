@@ -8,9 +8,9 @@ my $build = Module::Build->new(
 	dist_abstract      => 'POE-based simple chat server',
 	license            => 'gpl',
 	requires           => {
-		'perl'            => '5.6.1',
-		POE               => 0.26,
-		Haver             => 0.05,
+		'perl'            => '5.8.0',
+		POE               => 0.27,
+		Haver             => 0.06,
 		YAML              => 0.35,
 		'Digest::SHA1'    => 2.01,
 	},
@@ -20,5 +20,4 @@ my $build = Module::Build->new(
 
 $build->create_build_script;
 
-	
 

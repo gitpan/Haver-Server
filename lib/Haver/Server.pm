@@ -1,4 +1,4 @@
-# Haver::Server - The Server class.
+# Haver::Server - Haver server daemon.
 # 
 # Copyright (C) 2003-2004 Dylan William Hardison
 #
@@ -17,72 +17,105 @@
 # Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package Haver::Server;
 use strict;
-#use warnings;
+use open ":utf8";
 
-our %Feature;
-our $Config;
-our $Registry;
-our $VERSION = 0.052;
-BEGIN {
-	use open ":utf8";
-	use Exporter;
-	use base 'Exporter';
 
-	our $RELOAD  = 1;
-	our @EXPORT = ();
-	our @EXPORT_OK = qw( $Registry $Config %Feature );
-}
-
-use IO::Poll;
+use Data::Dumper;
+#use IO::Poll;
 use POE;
+
+use Haver::Server::Globals qw( $Store $Registry %Feature $Config );
 use Haver::Server::Listener;
 use Haver::Server::Registry;
-use Haver::Server::Channel;
-use Haver::Server::User;
+use Haver::Server::Object::Channel;
+use Haver::Server::Object::User;
+use Haver::Server::Object::Index;
+
+use Haver::Preprocessor;
 
 use Haver::Config;
-use Haver::Utils::Logger;
-use Haver::Protocol::Filter;
+use Haver::Logger;
 use Haver::Reload;
+
+
+our $VERSION = 0.06;
+
 
 sub boot {
 	my ($this, %opts) = @_;
 	$|++;
 
+	ASSERT: $opts{confdir};
+	ASSERT: $opts{datadir};
 
+	Haver::Server::Globals->init(
+		Config   => new Haver::Config(
+			file => "$opts{confdir}/config.yml",
+			default => {
+				IKC => {
+					Host => 'localhost',
+					Name => 'HaverServer',
+					Port => 4040,
+				},
+				Logs => {},
+				Server => {
+					LineLimit => 2048,
+					PingTime  => 60,
+					Port => 7071,
+				},
+			},
+		),
+		Store    => new Haver::Config(
+			file => "$opts{datadir}/store.yml",
+			default => {
+				Channels => [qw( lobby basement )],
+				Roles => {
+					admin => {
+						speak => 1,
+						kill  => 1,
+						reload => 1,
+					},
+				},
+			},
+		),
+		Registry => instance Haver::Server::Registry,
+	);
+	
 	eval {
 		require  POE::Component::IKC::Server;
 		import  POE::Component::IKC::Server;
 	};
 	unless ($@) {
 		create_ikc_server(
-			ip    => 'localhost', 
-			port  => 4040,
-			name  => 'Haver'
+			ip    => $Config->{IKC}{Host} || 'localhost', 
+			port  => $Config->{IKC}{Port} || '4040',
+			name  => $Config->{IKC}{Name} || 'HaverServer',
 		);
 		$Feature{IKC} = 1;
 	}
 	
 
 	Haver::Reload->init;
-	$Config   = new Haver::Config(file => $opts{config});
-	$Registry = instance Haver::Server::Registry;
+	$Config->{Server}{PingTime} ||= 60;
+	Haver::Server::Object->store_dir( "$opts{datadir}/store" );
 
-	foreach my $cid (@{ $Config->{Channels} }) {
-		my $chan = new Haver::Server::Channel(id => $cid);
+
+	foreach my $cid (@{ $Store->{Channels} }) {
+		my $chan = new Haver::Server::Object::Channel(id => $cid);
 		eval { $chan->load };
 		if ($@) {
 			warn "Can't load $cid.\n$@";
 		}
+		$chan->set(_perm => 1);
 		$Registry->add($chan);
 	}
 
 	
-	$this->create(%opts);
+	$this->create;
 	$poe_kernel->run();
 }
 sub create {
-	my ($class, %opts) = @_;
+	my ($class) = @_;
 	POE::Session->create(
 		package_states => [
 			$class => [
@@ -93,35 +126,48 @@ sub create {
 				'shutdown',
 			]
 		],
-		heap => \%opts,
+		heap => {},
 	);
 }
 
 sub _start {
 	my ($kernel, $heap) = @_[KERNEL, HEAP];
-	my $port = $heap->{port} || $Config->{ServerPort} || 7070;
+	my $port = $Config->{Server}{Port} || 7070;
 	
 	print "Server starts.\n";
-	create Haver::Utils::Logger    (logfile => $heap->{logfile} || '-');
-	create Haver::Server::Listener (port => $port);
+	create Haver::Logger (
+		levels => $Config->{Logs},
+	);
+	create Haver::Server::Listener (
+		port => $port
+	);
 
+		$poe_kernel->post('IKC', 'publish', 'Registry',
+			[qw( spoof )]);
+
+	
 	$kernel->sig('INT' => 'intterrupt');
 	$kernel->sig('DIE' => 'die');
 }
 sub _stop {
 	print "Server stops.\n";
 
-	$Config->{Channels} = $Registry->list_ids('channel');
+	my @chans;
+	$Store->{Channels} = \@chans;
 
 	foreach my $chan ($Registry->list_vals('channel')) {
-		eval { $chan->save };
-		if ($@) {
-			warn "Can't save ".$chan->id.":\n$@";
+		if ($chan->has('_perm')) {
+			push(@chans, $chan->id);
+			$chan->save;
 		}
 	}
+	
+	$Store->save;
+	$Config->save;
 }
 
 sub die {
+	print "Got DIE\n";
 }
 
 sub interrupt {
@@ -146,17 +192,29 @@ Haver::Server - Haver chat server.
 
 =head1 DESCRIPTION
 
-Stub documentation for Haver::Server, created by h2xs. It looks like the
-author of the extension was negligent enough to leave the stub
-unedited.
+Haver::Server is the unified interface for the entire Haver chat server
+collection of modules. haverd.pl is just a small wrapper around
+this module. This module requires a lot more documentation than I
+can produce at this time, so I will just ramble on about how, in general,
+to use it.
 
-Blah blah blah.
+The most basic usage is to say perl
+C<-MHaver::Server -e'Haver::Server-E<gt>boot(option =E<gt> "value", etc =E<gt> "foo")>
+
+There are a number of options, such as bindaddr, port, ikc_port, ikc_bindaddr,
+which I will have to explain later. Right now the interface may change or be completely
+different. I'm not entirely sure this module shouldn't be under the POE::Component::Server::
+namespace, as the client portion of haver is. I do really like the current namespace,
+but this being an open source projct, perhaps I will not get my way.
+
+I do not think Haver::Server will replace IRC, IRC has some nice features that I have no wont
+to implement in haver yet many people find necessary. Perhaps someone else can come
+along, take the code, and implement them.
+
 
 =head2 EXPORT
 
 None by default.
-
-
 
 =head1 SEE ALSO
 

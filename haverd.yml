@@ -1,7 +1,0 @@
---- #YAML:1.0
-Channels:
-  - lobby
-  - edynn
-PingTime: 120
-ServerPort: 7070
-StoreDir: './store'

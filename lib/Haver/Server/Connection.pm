@@ -20,24 +20,25 @@
 # TODO, write POD. Soon.
 package Haver::Server::Connection;
 use strict;
-#use warnings;
-use Carp;
+use Carp qw(croak confess carp cluck);
+
 use POE qw(
 	Wheel::ReadWrite
 	Driver::SysRW
 	Preprocessor
+	Filter::Haver
 );
-#use Hash::Util qw(lock_keys);
+
 use Haver::Protocol;
-use Haver::Server           qw( $Registry $Config );
-use Haver::Server::Commands;
+use Haver::Server::Globals qw( $Registry $Config );
+use Haver::Server::Connection::Commands;
 use Digest::SHA1 qw( sha1_base64 );
 
 our $RELOAD = 1;
 
 sub create {
 	my ($class, @args) = @_;
-	my $C = "Haver::Server::Commands";
+	my $C = "Haver::Server::Connection::Commands";
 
 	POE::Session->create(
 		package_states => [ 
@@ -47,15 +48,15 @@ sub create {
 				'_stop'     => '_stop',
 				'_default'  => '_default',
 				
+				
 				# Wheel states
 				'socket_input'  => 'socket_input',
 				'socket_error'  => 'socket_error',
 				'socket_flush'  => 'socket_flush',
 				
 				# Utility states
-				'send'      => 'on_send',
 				'want'      => 'on_want',
-				'shutdown'  => 'on_shutdown',
+				'cleanup'  => 'on_cleanup',
 				'bye'     => 'on_bye',
 				'warn'      => 'on_warn',
 				'die'       => 'on_die',
@@ -63,6 +64,8 @@ sub create {
 				'reject'    => 'on_reject',
 				'askpass'   => 'on_askpass',
 				'send_ping' => 'on_send_ping',
+				'broadcast' => 'on_broadcast',
+
 			},
 			$C => $C->commands,
 		],
@@ -83,9 +86,9 @@ sub _start {
 
 	binmode $socket, ":utf8";
 	my $sock = new POE::Wheel::ReadWrite(
-		Handle => $socket,
-		Driver => new POE::Driver::SysRW,
-		Filter => new Haver::Protocol::Filter,
+		Handle       => $socket,
+		Driver       => new POE::Driver::SysRW,
+		Filter       => new POE::Filter::Haver,
 		InputEvent   => 'socket_input',
 		FlushedEvent => 'socket_flush',
 		ErrorEvent   => 'socket_error',
@@ -109,15 +112,15 @@ sub _start {
 		plonk       => 0,
 		want        => undef,
 		want_data   => undef, # called if CANT $WANT...
-		version     => undef,
 		user        => undef,
 		uid         => undef,
+		mode        => 'old',
 	);
 
 	$kernel->yield('want', 'VERSION',
 		code => sub {
 			$kernel->yield('bye', 'CANT VERSION');
-		}
+		},
 	);
 
 }
@@ -172,7 +175,7 @@ sub socket_input {
 		$kernel->alarm_remove($heap->{ping});
 		$heap->{ping} = $kernel->alarm_set(
 			'send_ping',
-			time + $Config->{PingTime});
+			time + $Config->{Server}{PingTime});
 	}
 
 	my $want = 0;
@@ -189,6 +192,8 @@ sub socket_input {
 	}
 
 	if ($heap->{user} or $want) {
+		$heap->{scope} = {
+		};
 		$kernel->yield("cmd_$cmd", $args);
 	} else {
 		$kernel->yield('die', 'SPEEDY');
@@ -208,45 +213,57 @@ sub socket_error {
 		"Socket generated $operation error ${errnum}: $errstr");
 
 	$heap->{socket} = undef;
-	$kernel->yield('shutdown', 'DISCON');
+	$kernel->yield('cleanup', 'DISCON');
 }
 
-sub on_send {
-	my ($kernel, $heap, @msgs) = @_[KERNEL, HEAP, ARG0 .. $#_];
-	$heap->{socket}->put(@msgs) if $heap->{socket};
-}
 
 sub on_bye {
 	my ($kernel, $heap, $session, @args) = @_[KERNEL, HEAP, SESSION, ARG0 .. $#_];
-	$kernel->call($session, 'send', ['BYE', @args]);
-	$kernel->yield('shutdown', @args);
+	return if $heap->{shutdown};
+
+	$heap->{socket}->put(['BYE', @args]);
+	$heap->{shutdown} = 1;
+	$kernel->yield('cleanup', @args);
 }
+
 sub on_want {
 	my ($kernel, $heap, $want, %opts) = @_[KERNEL, HEAP, ARG0 .. $#_];
 
-	$want =~ s/\W//g;
-	$want = uc $want;
+	#$want =~ s/\W//g;
+	#$want = uc $want;
 
+	$kernel->post('Logger', 'note', "Want: $want");
+	unless ($heap->{socket}) {
+		my ($file, $line) = @_[CALLER_FILE,CALLER_LINE];
+		$kernel->post('Logger', 'error', "on_want called with undefined socket at $file line $line!");
+		return;
+	}
 	$heap->{want} = $want;
-	$heap->{want_data} = \%opts;
+	delete $heap->{want_data}{code};
+
+	foreach my $key (keys %opts) {
+		$heap->{want_data}{$key} = $opts{$key};
+	}
+
 	my @args = $opts{args} ? @{$opts{args}} : ();
-	$kernel->yield('send', ['WANT', $want, @args])
-		unless delete $opts{no_send};
+	$heap->{socket}->put(['WANT', $want, @args])
+		unless delete $heap->{want_data}{no_send};
 }
-sub on_shutdown {
+sub on_cleanup {
 	my ($kernel, $heap, @args) = @_[KERNEL, HEAP, ARG0 .. $#_];
 
-	if (!$heap->{shutdown}) {
-		$kernel->post('Logger', 'note', 'Shutting down client session.');
+	if (!$heap->{cleanup}) {
+		$kernel->call('Logger', 'note', 'Shutting down client session.');
 		my $user = $heap->{user};
 		my $uid  = $heap->{uid};
-		$heap->{shutdown} = 1;
+		$heap->{cleanup} = 1;
 		$heap->{plonk} = 1;
 		$heap->{user} = undef;
 		$heap->{uid} = undef;
 		
 		$kernel->alarm_remove_all();
-		if ($uid && $Registry->remove('user', $uid)) {
+		if ($uid) {
+			$Registry->remove('user', $uid);
 			my @users = ();
 			foreach my $chan ($user->list_vals('channel')) {
 				$user->remove($chan);
@@ -254,38 +271,33 @@ sub on_shutdown {
 				push(@users, $chan->list_vals('user'));
 			}
 			my %users = map { ($_ => $_) } @users;
+			my $msg = ['QUIT', $uid, @args];
 			foreach my $u (values %users) {
-				$u->send(['QUIT', $uid, @args]);
+				eval { $u->send($msg) };
 			}
 		}
 		if ($user) {
-			if ($user->password) {
-				eval {
-					$user->save;
-				};
-				if ($@) {
-					warn $@;
-				}
-			}
-			($heap->{port}, $heap->{address}) = $user->get('_port', '_address');
+			($heap->{port}, $heap->{address}) = $user->get('.port', '.address');
+			$user->save if $user->password;
 		}
-
 	} else {
-		$kernel->post('Logger', 'error', 'Trying to shutdown more than once!');
+		$kernel->post('Logger', 'error', "Trying to run cleanup more than once! @args");
 	}
 }
 
 sub on_die {
 	my ($kernel, $heap, $err, @data) = @_[KERNEL, HEAP, ARG0 .. $#_];
 
-	$kernel->yield('send', ['DIE', $err, @data]);
+	$heap->{socket}->put(['DIE', $err, @data]);
 	$kernel->yield('bye', 'DIE');
 }
 sub on_warn {
 	my ($kernel, $heap, $err, @data) = @_[KERNEL, HEAP, ARG0 .. $#_];
-	
-	$kernel->yield('send', ['WARN', $err, @data]);
+
+	$kernel->post('Logger', 'warn', "Warning $heap->{uid}: $err");
+	$heap->{socket}->put(['WARN', $err, @data]);
 }
+
 
 sub on_accept {
 	my ($kernel, $heap, $uid, $user) = @_[KERNEL, HEAP, ARG0, ARG1];
@@ -293,28 +305,34 @@ sub on_accept {
 	$kernel->alarm_remove(delete $heap->{timer});
 	$heap->{ping} = $kernel->alarm_set(
 		'send_ping',
-		time + $Config->{PingTime});
+		time + $Config->{Server}{PingTime});
 	$heap->{ping_time} = undef;
 	
+
 
 	$Registry->add($user);
 	$heap->{user} = $user;
 	$heap->{uid}  = $uid;
 	my $addr = join('.', (split(/\./, $heap->{address}))[0,1,2]) . '.*';
 	$user->set(
-		_address  => delete $heap->{address},
-		_port     => delete $heap->{port},
-		address   => $addr,
-		version   => delete $heap->{want_data}{version},
+		version     => delete $heap->{want_data}{version},
+		mode        => delete $heap->{want_data}{mode},
+		address     => $addr,
+		'.address'  => delete $heap->{address},
+		'.port'     => delete $heap->{port},
 	);
+	$user->set_flags('version',  'lp');
+	$user->set_flags('address',  'l');
+	$user->set_flags('.address', 'l');
+	$user->set_flags('.port', 'l');
 
-
-	$kernel->yield('send', ['ACCEPT', $uid]);
+	$heap->{socket}->put(['ACCEPT', $uid], ['LINE', $Config->{Server}{LineLimit}]);
 }
+
 sub on_reject {
 	my ($kernel, $heap, $uid, $err) = @_[KERNEL, HEAP, ARG0, ARG1];
 
-	$kernel->yield('send', ['REJECT', $uid, $err]);
+	$heap->{socket}->put(['REJECT', $uid, $err]);
 	$kernel->yield('want', 'UID',
 		code => sub {
 			$kernel->yield('bye', 'CANT UID');
@@ -342,12 +360,28 @@ sub on_send_ping {
 	my ($kernel, $heap) = @_[KERNEL, HEAP];
 
 	my $time = time;
-	$kernel->yield('send', ['PING', $time]);
+	$heap->{socket}->put(['PING', $time]);
+	
 	$heap->{ping} = $kernel->alarm_set(
-		'bye', time + $Config->{PingTime}, 'PING');
+		'bye', time + $Config->{Server}{PingTime}, 'PING');
 	$heap->{ping_time} = $time;
 
 	$kernel->post('Logger', 'note', "Sending PING: $time");
+}
+
+sub on_broadcast {
+	my ($kernel, $heap, $cid, $users, @rest) = @_[KERNEL, HEAP, ARG0 .. $#_];
+
+	foreach my $u (@$users) {
+		my $mode = $u->get('mode');
+
+		if ($mode eq 'multi') {
+			$u->send(['IN', $cid, @rest]);
+		} elsif ($mode eq 'single') {
+			$u->send(\@rest);
+		}
+	}
+	
 }
 
 1;

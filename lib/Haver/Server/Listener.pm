@@ -80,7 +80,8 @@ sub socket_birth {
 	create Haver::Server::Connection ($socket, $address, $port);
 }
 sub socket_fail {
-	die "Bad things!!!";
+	my ($kernel, $heap, $operation, $errnum, $errstr, $wheel_id) = @_[KERNEL, HEAP, ARG0..ARG3];
+	die "Listener: '$operation' failed: $errstr";
 }
 
 sub shutdown {

@@ -1,41 +1,46 @@
 --- #YAML:1.0
 name: haver-server
-version: 0.052
+version: 0.06
+author:
+  - Dylan William Hardison <dylanwh@tampabay.rr.com>
+abstract: POE-based simple chat server
 license: gpl
-distribution_type: module
 requires:
   Digest::SHA1: 2.01
-  Haver: 0.05
-  POE: 0.26
+  Haver: 0.06
+  POE: 0.27
   YAML: 0.35
-  perl: 5.6.1
-recommends: {}
-build_requires: {}
-conflicts: {}
+  perl: 5.8.0
 provides:
   Haver::Server:
     file: lib/Haver/Server.pm
-    version: 0.052
-  Haver::Server::Channel:
-    file: lib/Haver/Server/Channel.pm
-    version: 0.02
-  Haver::Server::Commands:
-    file: lib/Haver/Server/Commands.pm
-    version: 0.02
+    version: 0.06
   Haver::Server::Connection:
     file: lib/Haver/Server/Connection.pm
+  Haver::Server::Connection::Commands:
+    file: lib/Haver/Server/Connection/Commands.pm
+    version: 0.02
+  Haver::Server::Globals:
+    file: lib/Haver/Server/Globals.pm
+    version: 0.055
   Haver::Server::Listener:
     file: lib/Haver/Server/Listener.pm
   Haver::Server::Object:
     file: lib/Haver/Server/Object.pm
-    version: 0.01
+    version: 0.04
+  Haver::Server::Object::Channel:
+    file: lib/Haver/Server/Object/Channel.pm
+    version: 0.05
+  Haver::Server::Object::Hammer:
+    file: lib/Haver/Server/Object/Hammer.pm
+    version: 0.04
   Haver::Server::Object::Index:
     file: lib/Haver/Server/Object/Index.pm
-    version: 0.03
+    version: 0.04
+  Haver::Server::Object::User:
+    file: lib/Haver/Server/Object/User.pm
+    version: 0.04
   Haver::Server::Registry:
     file: lib/Haver/Server/Registry.pm
     version: 0.03
-  Haver::Server::User:
-    file: lib/Haver/Server/User.pm
-    version: 0.03
-generated_by: Module::Build version 0.21
+generated_by: Module::Build version 0.24

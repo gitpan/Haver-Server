@@ -20,10 +20,26 @@ use strict;
 use warnings;
 use Carp;
 
-our $VERSION = '0.03';
+
+our $VERSION = '0.04';
+our $RELOAD  = 1;
 
 sub namespace {
 	return 'container';
+}
+
+sub has_namespace {
+	my ($me, $ns) = @_;
+	return exists $me->{".$ns"};
+}
+
+sub namespaces {
+	my ($me) = @_;
+	my @ns = ();
+
+	@ns = grep(s/^\.//, keys %{ $me });
+
+	return wantarray ? @ns : \@ns;
 }
 
 sub add {
@@ -33,10 +49,12 @@ sub add {
 	
 	if (not($me->contains($ns, $id)) && $me->can_contain($object)) {
 		$me->{".$ns"}{$id} = $object;
+		$me->{".$ns"}{$id}
 	} else {
 		return undef;
 	}
 }
+
 sub fetch {
 	my ($me, $ns, $id) = @_;
 	if (@_ != 3) {
@@ -45,14 +63,17 @@ sub fetch {
 
 	return $me->{".$ns"}{$id} if $me->contains($ns, $id);
 }
+
 sub contains {
 	my ($me, $ns, $id) = @_;
 	if (@_ != 3) {
 		croak "contains must be called with exactly three arguments!";
 	}
 	
+	delete $me->{".$ns"}{$id} unless defined $me->{".$ns"}{$id};
 	return exists $me->{".$ns"}{$id};
 }
+
 sub remove {
 	my $me = shift;
 	my ($ns, $id);
@@ -68,6 +89,7 @@ sub remove {
 	}
 	delete $me->{".$ns"}{$id};
 }
+
 sub list_ids {
 	my ($me, $ns) = @_;
 	my $h = $me->{".$ns"};
