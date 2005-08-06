@@ -1,6 +1,6 @@
 ---
 name: Haver-Server
-version: 0.08
+version: 0.082
 author:
   - Dylan Hardison <dylan@haverdev.org>
 abstract: Reference implementation of the Haver chat server.
@@ -13,7 +13,7 @@ requires:
 provides:
   Haver::Server:
     file: lib/Haver/Server.pm
-    version: 0.08
+    version: 0.082
   Haver::Server::Config:
     file: lib/Haver/Server/Config.pm
     version: 0.01

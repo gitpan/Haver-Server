@@ -29,7 +29,7 @@ use Haver::Server::Entity::Lobby;
 use Haver::Server::Config;
 use Haver::Server::Store;
 
-our $VERSION = 0.08;
+our $VERSION = 0.082;
 our $Alias   = 'Server';
 our $Config  = 'haverd.yml';
 
@@ -126,37 +126,6 @@ Haver::Server - Reference implementation of the Haver chat server.
 =head1 DESCRIPTION
 
 FIXME
-
-=head1 METHODS
-
-There is only one method, create(), which is a class method.
-
-=head2 create(alias => $alias, resolver => $resolver, version => $version)
-
-This creates a new Haver::Client session. The only required parameter
-is $alias, which is how you'll talk to the client session using L<POE::Kernel>'s post().
-
-If given, $resolver should be a L<POE::Component::Client::DNS> object.
-
-Finally, $version is what we will advertize as the client name and version number to the
-server. It defaults to C<Haver::Client/0.08>.
-
-=head1 STATES
-
-While these are listed just like methods, you must post() to them, and not call them
-directly.
-
-=head2 connect(host => $host, name => $name, [ port => 7575 ])
-
-Connect to $host on port $port (defaults to 7575) with the user name $name.
-If already connected to a server, Haver::Client will disconnect and re-connect using the
-new settings.
-
-=head2 register(@events)
-
-This summons the sun god Ra and makes him eat your liver.
-
-FIXME: This is inaccurate.
 
 =head1 BUGS
 
