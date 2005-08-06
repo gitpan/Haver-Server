@@ -1,0 +1,61 @@
+This file contains message digests of all files listed in MANIFEST,
+signed via the Module::Signature module, version 0.44.
+
+To verify the content in this distribution, first make sure you have
+Module::Signature installed, then type:
+
+    % cpansign -v
+
+It will check each file's integrity, as well as the signature's
+validity.  If "==> Signature verified OK! <==" is not displayed,
+the distribution may already have been compromised, and you should
+not run its Makefile.PL or Build.PL.
+
+-----BEGIN PGP SIGNED MESSAGE-----
+Hash: SHA1
+
+SHA1 839734c7a918ceac4ded4f564a17629b786724bd Build.PL
+SHA1 dff323fd8c551f59ae926d726f0ce3a5d8eae36c COPYING
+SHA1 dd3aa4a4f6951a57a6450e4acd8e70b6f403f389 MANIFEST
+SHA1 b849435d3bf7c856466566702657d8250bda7f08 MANIFEST.SKIP
+SHA1 6ec40d1fd73a7bb529990a80d497c0123ae81db5 META.yml
+SHA1 a359d4072690a21ce63e4b393bdbc19d72b6be5a Makefile.PL
+SHA1 7d15837763a5cc0e8f317044ba8f75ab73f4374c NEWS
+SHA1 5caf31828c4a7178de9d3dda08017dc373851114 README
+SHA1 e9f0737312863588a53731eb1545c4d28b759cb2 TODO
+SHA1 ffcc80a960a9d143b3ce29d5a48a34a389034d9d bin/haverd.pl
+SHA1 cceabdb4bfefdefb630bef7790ec01d4b4514967 debian/changelog
+SHA1 9c6b057a2b9d96a4067a749ee3b3b0158d390cf1 debian/compat
+SHA1 2a4fc3b348f94c6522f1846d583508a47a008013 debian/control
+SHA1 581dc6fcd250290e81e7ff4ed59fafd9ff816812 debian/copyright
+SHA1 7c88885d9999d8b825ac46fe276664d45d28f463 debian/keyid
+SHA1 e00c8136656c2c96b91762f4b857c72e6bf91f93 debian/rules
+SHA1 b9663002041d9ffd468dd5cccc34b9d10fe74edc haverd.yml
+SHA1 81011706fec5b0d2839dbcb5edab9cadd383ac53 lib/Haver/Server.pm
+SHA1 670e485c111018442e956dcf6e6070471e77b405 lib/Haver/Server/Config.pm
+SHA1 e5958902e33380a7bbb89af86a71768053b8cf60 lib/Haver/Server/Entity.pm
+SHA1 d57539bd8eaeda74ced166c0ba1599373a99aead lib/Haver/Server/Entity/Avatar.pm
+SHA1 53172a09ad1352dd97c98f1caae7a77593b995cf lib/Haver/Server/Entity/Channel.pm
+SHA1 4b20c6eeaa74913d860c46a9c192014259ab1921 lib/Haver/Server/Entity/Lobby.pm
+SHA1 eb2e8efa6380bbac330069f44f71d6f2123f59b4 lib/Haver/Server/Entity/Service.pm
+SHA1 f71fda98217927df73ba3b12be10747ae8e6b84e lib/Haver/Server/Entity/User.pm
+SHA1 ccb2153d97dd3f1c740bcdffe1c98ce78ec4c60b lib/Haver/Server/Listener.pm
+SHA1 a5c6020e59672b13176b0b23054826fb969dc01c lib/Haver/Server/Store.pm
+SHA1 ef4c18774cd1a49426a5121423aa909745ac0a53 lib/Haver/Server/Talker.pm
+SHA1 2c0e0f6eaee154b4d8f8d2e506e7b74036b660ac lib/Haver/Server/Wheel.pm
+SHA1 839c62eda887a678def0b93ed312668fc471a577 lib/Haver/Server/Wheel/Auth.pm
+SHA1 3a249e877fe179b7ecbb303fd37cba71d4ec0aa4 lib/Haver/Server/Wheel/Login.pm
+SHA1 abdfef85761f2db9b7bfc32fd288a3cabc1992b3 lib/Haver/Server/Wheel/Main.pm
+SHA1 5aab9eb23f1be5cc554a523e1a2cb4ff26505f05 lib/Haver/Server/Wheel/Reg.pm
+SHA1 260408a8083e8d95518fbb354985a1ffc6582c7f t/000_use.t
+SHA1 91727384ce218ebd7f6f9f7b3ab7e542d4b0acab t/001_entity.t
+SHA1 79a3e6ef499f6b7662195ccbe11341a9236ccd9d t/002_avatar.t
+SHA1 cf65df440ecadf50a4f904f5907f456fe1f070a3 t/003_user.t
+SHA1 40eb25224e5e41e519cf6b119d34b74e4ec0e49a t/005_lobby.t
+-----BEGIN PGP SIGNATURE-----
+Version: GnuPG v1.4.1 (GNU/Linux)
+
+iD8DBQFC9Eicdw4Or/tTEsIRAj1jAKDaued7jH2rcRvTNCn0jEjUX9TX1ACfQ3RH
+DLjCAR3Sz7xo3VoGHNLzNWU=
+=rmYY
+-----END PGP SIGNATURE-----

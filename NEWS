@@ -1,1 +1,3 @@
-The server now supports UTF-8.
+
+* We're using the fifth version of the protocol...
+* Error names are now saner but we need to work on them.

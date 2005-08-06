@@ -1,4 +1,4 @@
-Haver-Server version 0.06 ("Lamp")
+Haver-Server version 0.08 ("MuffinWillKillMe")
 =========================
 
 Haver's a new chat system similar to IRC,
@@ -20,8 +20,6 @@ Also, writing the server, the clients,
 devising a protocol that is simple, is
 terribly fun stuff.
 
-
-
 INSTALLATION
 
 To install this module type the following:
@@ -34,7 +32,7 @@ To install this module type the following:
 DEPENDENCIES
 
 POE          => 0.27
-Haver        => 0.04
+Haver        => 0.07
 YAML         => 0.35
 Digest::SHA1 => 2.01
 

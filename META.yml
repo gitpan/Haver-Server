@@ -1,46 +1,56 @@
---- #YAML:1.0
-name: haver-server
-version: 0.06
+---
+name: Haver-Server
+version: 0.08
 author:
-  - Dylan William Hardison <dylanwh@tampabay.rr.com>
-abstract: POE-based simple chat server
+  - Dylan Hardison <dylan@haverdev.org>
+abstract: Reference implementation of the Haver chat server.
 license: gpl
 requires:
   Digest::SHA1: 2.01
-  Haver: 0.06
+  Haver::Core: 0.08
   POE: 0.27
-  YAML: 0.35
   perl: 5.8.0
 provides:
   Haver::Server:
     file: lib/Haver/Server.pm
-    version: 0.06
-  Haver::Server::Connection:
-    file: lib/Haver/Server/Connection.pm
-  Haver::Server::Connection::Commands:
-    file: lib/Haver/Server/Connection/Commands.pm
-    version: 0.02
-  Haver::Server::Globals:
-    file: lib/Haver/Server/Globals.pm
-    version: 0.055
+    version: 0.08
+  Haver::Server::Config:
+    file: lib/Haver/Server/Config.pm
+    version: 0.01
+  Haver::Server::Entity:
+    file: lib/Haver/Server/Entity.pm
+  Haver::Server::Entity::Avatar:
+    file: lib/Haver/Server/Entity/Avatar.pm
+    version: 0.08
+  Haver::Server::Entity::Channel:
+    file: lib/Haver/Server/Entity/Channel.pm
+    version: 0.22
+  Haver::Server::Entity::Lobby:
+    file: lib/Haver/Server/Entity/Lobby.pm
+    version: 0.22
+  Haver::Server::Entity::Service:
+    file: lib/Haver/Server/Entity/Service.pm
+  Haver::Server::Entity::User:
+    file: lib/Haver/Server/Entity/User.pm
   Haver::Server::Listener:
     file: lib/Haver/Server/Listener.pm
-  Haver::Server::Object:
-    file: lib/Haver/Server/Object.pm
-    version: 0.04
-  Haver::Server::Object::Channel:
-    file: lib/Haver/Server/Object/Channel.pm
-    version: 0.05
-  Haver::Server::Object::Hammer:
-    file: lib/Haver/Server/Object/Hammer.pm
-    version: 0.04
-  Haver::Server::Object::Index:
-    file: lib/Haver/Server/Object/Index.pm
-    version: 0.04
-  Haver::Server::Object::User:
-    file: lib/Haver/Server/Object/User.pm
-    version: 0.04
-  Haver::Server::Registry:
-    file: lib/Haver/Server/Registry.pm
     version: 0.03
-generated_by: Module::Build version 0.24
+  Haver::Server::Store:
+    file: lib/Haver/Server/Store.pm
+    version: 0.01
+  Haver::Server::Talker:
+    file: lib/Haver/Server/Talker.pm
+    version: 0.08
+  Haver::Server::Wheel:
+    file: lib/Haver/Server/Wheel.pm
+    version: 0.04
+  Haver::Server::Wheel::Auth:
+    file: lib/Haver/Server/Wheel/Auth.pm
+  Haver::Server::Wheel::Login:
+    file: lib/Haver/Server/Wheel/Login.pm
+    version: 0.02
+  Haver::Server::Wheel::Main:
+    file: lib/Haver/Server/Wheel/Main.pm
+  Haver::Server::Wheel::Reg:
+    file: lib/Haver/Server/Wheel/Reg.pm
+generated_by: Module::Build version 0.26

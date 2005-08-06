@@ -1,0 +1,6 @@
+libhaver-server-perl (0.08-1) unstable; urgency=low
+
+  * Initial conversion to debian package.
+
+ -- Dylan Hardison <dylan@haverdev.org>  Mon,  1 Aug 2005 17:23:33 -0400
+

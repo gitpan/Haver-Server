@@ -18,25 +18,10 @@
 # Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 use strict;
 use warnings;
-BEGIN {
-	$Haver::Preprocessor::ASSERT = 1;
-	$Haver::Preprocessor::DUMP = 1;
-	$Haver::Preprocessor::DEBUG = 1;
-	$Haver::Preprocessor::VERBOSE = 1;
-}
-
+use lib qw( lib ../core/lib );
+use POE;
 use Haver::Server;
-use Getopt::Long;
-my $confdir = './conf';
-my $datadir = './data';
 
-GetOptions (
-	"confdir=s" => \$confdir,
-	"datadir=s" => \$datadir,
-);
-
-
-Haver::Server->boot(
-	confdir => $confdir,
-	datadir => $datadir,
-);
+$|++;
+create Haver::Server;
+POE::Kernel->run;

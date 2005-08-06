@@ -1,91 +1,113 @@
-# Haver::Server::Listener,
-# this creates a session that listens for connections,
-# and when something connects, it spawns
-# a Haver::Server::Connection session.
-# 
-# Copyright (C) 2003 Dylan William Hardison.
-#
-# This module is free software; you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation; either version 2 of the License, or
-# (at your option) any later version.
-#
-# This module is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this module; if not, write to the Free Software
-# Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
-
-# TODO, write POD. Soon.
 package Haver::Server::Listener;
 use strict;
 use warnings;
-use Carp;
-use POE qw(
-	Wheel::SocketFactory
-);
 
-use Haver::Server::Connection;
+use Haver::Session -base;
+use Haver::Server::Talker;
+use POE::Wheel::SocketFactory;
 
-sub create {
-	my ($class, %opts) = @_;
-	POE::Session->create(
-		package_states => 
-		[
-			$class => [
-				'_start',
-				'_stop',
-				'socket_birth',
-				'socket_fail',
-			]
-		],
-		heap => {
-			port => $opts{port},
-		},
-		args => [@_],
-	);
+our $VERSION = 0.03;
+our $Alias   = 'Listener';
+
+sub states {
+	return [qw(
+		_start
+		_stop
+		_child
+		socket_birth
+		socket_fail
+		listen
+		shutdown
+	)];
 }
 
 sub _start {
-	my ($kernel, $heap) = @_[KERNEL, HEAP];
-	my $port = $heap->{port};
+	my ($kernel, $heap, $opt) = @_[KERNEL, HEAP, ARG0];
+
+	$heap->{wheels}   = {};
+	$heap->{children} = {};
+	$heap->{talker}   = $opt->{talker};
+	my $config = $heap->{config} = $opt->{config};
+	$kernel->alias_set($Alias);
+	foreach my $iface (@{ $config->listen }) {
+		$kernel->yield('listen', $iface, { nosave => 1 });
+	}	
 	
+	Log("$Alias starts.");
+}
 
-	print STDERR "Listener starts.\n";
-	$kernel->post('Logger', 'note', "Listening on port $port.");
+sub _stop {
+    my ($kernel, $heap) = @_[KERNEL,HEAP];
 
-	$heap->{listener} = POE::Wheel::SocketFactory->new(
-		#BindAddress  => '127.0.0.1',
-		BindPort     =>  $port,
+    Log("$Alias stops.");
+}
+
+sub _child {
+	my ($kernel, $heap, $type, $kid) = @_[KERNEL, HEAP, ARG0, ARG1];
+
+	if ($type eq 'create' or $type eq 'gain') {
+		$heap->{children}{$kid->ID} = 1;
+	} elsif ($type eq 'lose') {
+		delete $heap->{children}{$kid->ID};
+	} else {
+		die "I don't know how I got here!\n";
+	}
+}
+
+
+sub listen {
+	my ($kernel, $heap, $hash, $opt) = @_[KERNEL, HEAP, ARG0, ARG1];
+	Log('notice', "Listening on port $hash->{port} with host $hash->{host}");
+
+	unless ($opt->{nosave}) {
+		my $l = $heap->{config}->listen;
+		push @$l, $hash;
+	}
+	
+	my $wheel = POE::Wheel::SocketFactory->new(
+		#BindAddress => $addr,
+		BindPort     => $hash->{port},
 		Reuse        => 1,
 		SuccessEvent => 'socket_birth',
 		FailureEvent => 'socket_fail',
 	);
-	$kernel->alias_set('Listener');
-}
-sub _stop {
-    my ($kernel, $heap) = @_[KERNEL,HEAP];
-	delete $heap->{listener};
-	delete $heap->{session};
-	print STDERR "Listener stops.\n";
+	$heap->{wheels}{$wheel->ID} = $wheel;
+	$heap->{info}{$wheel->ID}   = $hash;
 }
 
 sub socket_birth {
-    my ($kernel, $socket, $address, $port) = @_[ KERNEL, ARG0, ARG1, ARG2 ];
-
-
-	create Haver::Server::Connection ($socket, $address, $port);
+    my ($kernel, $heap, $socket, $address, $port, $wid) =
+	@_[KERNEL, HEAP, ARG0, ARG1, ARG2, ARG3];
+	
+	Log('Socket birth.');
+	$heap->{talker}->(
+		socket  => $socket,
+		address => Socket::inet_ntoa($address),
+		port    => $port,
+		info    => $heap->{info}{$wid},
+	);
 }
+
 sub socket_fail {
-	my ($kernel, $heap, $operation, $errnum, $errstr, $wheel_id) = @_[KERNEL, HEAP, ARG0..ARG3];
-	die "Listener: '$operation' failed: $errstr";
+	my ($kernel, $heap, $operation, $errnum, $errstr, $wid) = @_[KERNEL, HEAP, ARG0..ARG3];
+	delete $heap->{wheels}{$wid};
+
+	Log("Listener: Operation '$operation' failed: $errstr ($errnum)\n");
 }
 
 sub shutdown {
-	$_[KERNEL]->alias_remove('Listener');
+	my ($kernel, $heap) = @_[KERNEL, HEAP];
+
+	Log("Shutting down $Alias.");
+
+	$kernel->alias_remove($Alias);
+	
+	foreach my $kid (keys %{ $heap->{children} }) {
+		$kernel->post($kid, 'shutdown', 'die');
+	}
+	
+	delete $heap->{wheels};
 }
+
 
 1;

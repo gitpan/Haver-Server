@@ -9,3 +9,6 @@ _build
 \.tar\.gz$
 ^data
 ^conf
+.*-stamp
+^debian/files
+^debian/lib
